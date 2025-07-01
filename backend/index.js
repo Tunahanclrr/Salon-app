@@ -10,7 +10,7 @@ const app = express();
 connectDB(); // MongoDB bağlantısı
 
 // Sunucunun çalışacağı port numarasını belirler. Eğer .env dosyasındaki PORT değişkeni varsa, onu kullanır. Yoksa, varsayılan olarak 3000 portunu kullanır.
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 4000;
 app.use(cors());
 
 // Express uygulamasına JSON verisini işleyebilmesi için middleware ekler. Bu, gelen verilerin JSON formatında olduğunu belirterek doğru bir şekilde işlenmesini sağlar.
