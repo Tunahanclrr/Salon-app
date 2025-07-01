@@ -1,0 +1,27 @@
+require('dotenv').config();
+const mongoose = require('mongoose');
+const express = require('express');
+const connectDB = require('./config/db');
+
+const cors = require('cors');
+// Express uygulamasını başlatır. app, Express'in çalıştıracağı ana nesnedir.
+const app = express();
+
+connectDB(); // MongoDB bağlantısı
+
+// Sunucunun çalışacağı port numarasını belirler. Eğer .env dosyasındaki PORT değişkeni varsa, onu kullanır. Yoksa, varsayılan olarak 3000 portunu kullanır.
+const PORT = process.env.PORT || 5000;
+app.use(cors());
+
+// Express uygulamasına JSON verisini işleyebilmesi için middleware ekler. Bu, gelen verilerin JSON formatında olduğunu belirterek doğru bir şekilde işlenmesini sağlar.
+app.use(express.json());
+
+// Ana dizine gelen GET isteği için bir route tanımlar. Bu, bir kullanıcı "/ " adresine geldiğinde şu yanıtı dönecektir.
+app.get('/', (req, res) => {
+    res.send('Backend çalışıyor!'); // "/ " adresine gelen isteklerin yanıtı olarak bu mesaj döndürülür.
+});
+
+// Uygulamanın belirtilen port numarasında çalışmaya başlamasını sağlar. Sunucu başlatıldığında bir konsol mesajı verir.
+app.listen(PORT, () => {
+    console.log(`Sunucu ${PORT} portunda çalışıyor.`); // Sunucunun hangi portta çalıştığını konsola yazar.
+});
