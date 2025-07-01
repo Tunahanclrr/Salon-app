@@ -21,6 +21,10 @@ app.get('/', (req, res) => {
     res.send('Backend çalışıyor!'); // "/ " adresine gelen isteklerin yanıtı olarak bu mesaj döndürülür.
 });
 
+// Employee routes
+const employeeRoutes = require('./routes/employeeRoutes');
+app.use('/api', employeeRoutes);
+
 // Uygulamanın belirtilen port numarasında çalışmaya başlamasını sağlar. Sunucu başlatıldığında bir konsol mesajı verir.
 app.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`); // Sunucunun hangi portta çalıştığını konsola yazar.
