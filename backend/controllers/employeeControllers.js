@@ -61,7 +61,14 @@ exports.deleteEmployee = async (req, res) => {
 exports.getEmployeeById = async (req, res) => {
     try {
         const { id } = req.params;
-        const employee = await Employee.findById(id);
+        const employee = await Employee.findById(id)
+          .populate({
+            path: 'appointments',
+            populate: [
+              { path: 'employee', select: 'name email phone role gender' },
+              { path: 'customer', select: 'name phone email' }
+            ]
+          });
         if (!employee) {
             return res.status(404).json({ message: 'Çalışan bulunamadı.' });
         }

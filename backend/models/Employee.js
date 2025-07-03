@@ -28,11 +28,10 @@ const employeeSchema = new mongoose.Schema({
         enum: ['manikür', 'cilt bakım uzmanı', "epilasyon uzmanı"]
     },
     // Randevular (Appointment modelinden referans alır)
-    
-    //appointments: [{
-      //  type: mongoose.Schema.Types.ObjectId,
-    //    ref: 'Appointment'
-  //  }]
+    appointments: [{
+      type: mongoose.Schema.Types.ObjectId,
+        ref: 'Appointment'
+   }]
 
 }, { timestamps: true })
 

@@ -24,6 +24,12 @@ app.get('/', (req, res) => {
 // Employee routes
 const employeeRoutes = require('./routes/employeeRoutes');
 app.use('/api', employeeRoutes);
+const appointmentRoutes = require('./routes/appointmentRoutes');
+app.use('/api', appointmentRoutes);
+//müşteri route
+const customerRoutes = require('./routes/customerRoutes');
+app.use('/api', customerRoutes);
+
 
 // Uygulamanın belirtilen port numarasında çalışmaya başlamasını sağlar. Sunucu başlatıldığında bir konsol mesajı verir.
 app.listen(PORT, () => {
