@@ -1,4 +1,5 @@
 const Customer = require('../models/Customer');
+const Appointment = require('../models/Appointmen');
 
 // ✅ Yeni müşteri ekleme
 exports.createCustomer = async (req, res) => {
@@ -61,4 +62,22 @@ exports.deleteCustomer = async (req, res) => {
       res.status(500).json({ message: 'Sunucu hatası.' });
     }
   };
+
+// Bir müşterinin randevularını döner
+exports.getCustomerAppointments = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Müşteri var mı kontrol et
+    const customer = await Customer.findById(id);
+    if (!customer) {
+      return res.status(404).json({ message: 'Müşteri bulunamadı.' });
+    }
+    // Randevuları bul
+    const appointments = await Appointment.find({ customer: id }).populate('employee', 'name');
+    res.status(200).json({ customer, appointments });
+  } catch (error) {
+    console.error('getCustomerAppointments error:', error);
+    res.status(500).json({ message: 'Sunucu hatası.' });
+  }
+};
   

@@ -10,5 +10,5 @@ router.get('/employes',employeeController.getEmployeeById)
 router.get('/employees/:id', employeeController.getEmployeeById);
 // Tüm çalışanları listeleme
 router.get('/employees', employeeController.getAllEmployees);
-
+router.delete('/employees/:id', employeeController.deleteEmployee);
 module.exports = router;

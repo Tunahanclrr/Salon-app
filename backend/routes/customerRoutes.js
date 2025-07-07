@@ -7,5 +7,9 @@ router.post('/customers', customerController.createCustomer);
 
 // Tüm müşterileri listeleme (veya isme göre arama)
 router.get('/customers', customerController.getAllCustomers);
-router.delete('/customer',customerController.deleteCustomer)
+router.delete('/customers/:id', customerController.deleteCustomer)
+
+// Bir müşterinin randevularını getir
+router.get('/customers/:id/appointments', customerController.getCustomerAppointments);
+
 module.exports = router;

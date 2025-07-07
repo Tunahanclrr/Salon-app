@@ -37,7 +37,14 @@ exports.createEmployee = async (req, res) => {
 // Tüm çalışanları listeleme
 exports.getAllEmployees = async (req, res) => {
     try {
-        const employees = await Employee.find();  //const employees = await Employee.find();
+        const employees = await Employee.find()
+          .populate({
+            path: 'appointments',
+            populate: [
+              { path: 'customer', select: 'name phone email' },
+              { path: 'employee', select: 'name' }
+            ]
+          });
         res.status(200).json(employees);
     } catch (error) {
         console.error('getAllEmployees error:', error);

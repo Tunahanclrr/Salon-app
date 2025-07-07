@@ -9,7 +9,7 @@ const customerSchema = new mongoose.Schema({
   phone: {
     type: String,
     required: true,
-    unique: true, // Aynı numaradan birden fazla müşteri olmasın
+    unique: true, //benzersiz baska telefon no girilmez
     trim: true
   },
   email: {
