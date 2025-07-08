@@ -24,12 +24,30 @@ export const fetchAppointments = createAsyncThunk(
   }
 );
 
+// Randevu güncelleme thunk'ı
+export const updateAppointment = createAsyncThunk(
+  'appointments/updateAppointment',
+  async ({ id, appointmentData }, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.put(
+        `http://localhost:4000/api/appointments/${id}`,
+        appointmentData
+      );
+      return data;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Güncelleme sırasında hata oluştu';
+      return rejectWithValue(msg);
+    }
+  }
+);
+
 const appointmentsSlice = createSlice({
   name: 'appointments',
   initialState: {
     items: [],
     status: 'idle',
     error: null,
+    currentAppointment: null, // Düzenlenen randevuyu saklamak için
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -49,7 +67,24 @@ const appointmentsSlice = createSlice({
       .addCase(fetchAppointments.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.error.message;
+      })
+      .addCase(updateAppointment.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(updateAppointment.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        // Güncellenen randevuyu listede güncelle
+        const index = state.items.findIndex(app => app._id === action.payload._id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
+        state.currentAppointment = null; // Düzenleme tamamlandı
+      })
+      .addCase(updateAppointment.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
       });
+      
   },
 });
 

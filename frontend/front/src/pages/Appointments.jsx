@@ -1,58 +1,96 @@
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { FiCalendar, FiClock, FiUser, FiPlus } from 'react-icons/fi'
+import { FiCalendar, FiClock, FiUser, FiPlus, FiEdit3 } from 'react-icons/fi'
 import { fetchEmployees } from '../redux/employeesSlice'
-import { addAppointment } from '../redux/appointmentsSlice'
-import { addCustomer } from '../redux/customersSlice'
+import { fetchCustomers, addCustomer } from '../redux/customersSlice'
+import { fetchServices } from '../redux/servicesSlice'
+import { addAppointment, updateAppointment } from '../redux/appointmentsSlice'
 import Modal from '../components/Modal'
-import { toast } from 'react-toastify';
 import AppointmentForm from '../components/AppointmentForm'
+import AppointmentEditForm from '../components/AppointmentEditForm'
 import CustomerForm from '../components/CustomerForm'
-import { fetchCustomers } from '../redux/customersSlice';
+import { toast } from 'react-toastify'
+
 const Appointments = () => {
   const dispatch = useDispatch()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10))
   const [addModalOpen, setAddModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
   const [customerModalOpen, setCustomerModalOpen] = useState(false)
-  const customers = useSelector(state => state.customers.items);
-  // Çalışanlar. Her çalışanın içinde populate edilmiş appointments dizisi olduğunu varsayıyoruz.
+  const [editingAppointment, setEditingAppointment] = useState(null)
+
   const employees = useSelector(state => state.employees.items)
+  const customers = useSelector(state => state.customers.items)
 
   useEffect(() => {
     dispatch(fetchEmployees())
     dispatch(fetchCustomers())
+    dispatch(fetchServices())
   }, [dispatch])
-console.log(employees)
-  // Seçili güne ait randevuları döndür
+
   const getAppointmentsForEmployee = (employee) =>
     (employee.appointments || []).filter(app => app.date === selectedDate)
-  // Randevu ekle
-  const handleAddAppointment = async (form) => {
-    const res = await dispatch(addAppointment(form));
-    if (addAppointment.fulfilled.match(res)) {
-      toast.success(res.payload.message || 'Randevu oluşturuldu');
-      setAddModalOpen(false);
-      dispatch(fetchEmployees());
-    } else {
-      toast.error(res.payload || 'Randevu oluşturulamadı');
-    }
-  };
 
-  // Yeni müşteri ekleme
-  const handleAddCustomer = async (form) => {
-    const res = await dispatch(addCustomer(form));
-    if (addCustomer.fulfilled.match(res)) {
-      toast.success('Müşteri eklendi');
-      setCustomerModalOpen(false);
-      dispatch(fetchCustomers());
-    } else {
-      toast.error(res.payload || 'Müşteri eklenemedi');
+  // Yeni Randevu Ekleme
+  const handleAddAppointment = async (formData) => {
+    try {
+      const result = await dispatch(addAppointment(formData))
+      if (addAppointment.fulfilled.match(result)) {
+        toast.success('Randevu başarıyla oluşturuldu')
+        setAddModalOpen(false)
+        await Promise.all([dispatch(fetchEmployees()), dispatch(fetchCustomers())])
+      } else {
+        toast.error(result.payload || 'Randevu oluşturulamadı')
+      }
+    } catch (error) {
+      toast.error('Beklenmeyen bir hata oluştu')
     }
-  };
+  }
+
+  // Randevu Düzenleme
+  const handleEditAppointment = async (formData) => {
+    try {
+      const result = await dispatch(updateAppointment({ id: editingAppointment._id, appointmentData: formData }))
+      if (updateAppointment.fulfilled.match(result)) {
+        toast.success('Randevu başarıyla güncellendi')
+        setEditModalOpen(false)
+        setEditingAppointment(null)
+        await dispatch(fetchEmployees())
+      } else {
+        toast.error(result.payload || 'Güncelleme başarısız')
+      }
+    } catch (err) {
+      toast.error('Beklenmeyen hata oluştu')
+    }
+  }
+
+  // Müşteri Ekleme
+  const handleAddCustomer = async (form) => {
+    const result = await dispatch(addCustomer(form))
+    if (addCustomer.fulfilled.match(result)) {
+      toast.success('Müşteri başarıyla eklendi')
+      setCustomerModalOpen(false)
+      dispatch(fetchCustomers())
+    } else {
+      toast.error(result.payload || 'Müşteri eklenemedi')
+    }
+  }
+
+  const formatAppointmentTime = (appointment) => {
+    const startTime = appointment.time
+    const duration = appointment.duration || 30
+    const [hours, minutes] = startTime.split(':').map(Number)
+    const startDate = new Date(0, 0, 0, hours, minutes)
+    const endDate = new Date(startDate.getTime() + duration * 60000)
+
+    const formatTime = (date) => `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+
+    return `${formatTime(startDate)} - ${formatTime(endDate)} (${duration} dk)`
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Başlık */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Randevu Takvimi</h1>
@@ -97,16 +135,28 @@ console.log(employees)
                   </div>
                 ) : (
                   todays.map((app) => (
-                    <div key={app._id} className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100 hover:shadow-md transition-shadow">
+                    <div
+                      key={app._id}
+                      className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100 hover:shadow-md transition-shadow relative"
+                    >
                       <div className="flex items-start space-x-2 mb-2">
                         <FiUser className="w-4 h-4 text-blue-600" />
                         <span className="font-semibold text-gray-800">{app.customer?.name || 'Müşteri'}</span>
                       </div>
-                      <div className="text-sm text-gray-600 font-medium">{app.service}</div>
+                      <div className="text-sm text-gray-600 font-medium">{app.services?.[0]?.name}</div>
                       <div className="flex items-center space-x-2 text-sm text-gray-500 mt-1">
                         <FiClock className="w-4 h-4" />
-                        <span>{app.time}</span>
+                        <span>{formatAppointmentTime(app)}</span>
                       </div>
+                      <button
+                        onClick={() => {
+                          setEditingAppointment(app)
+                          setEditModalOpen(true)
+                        }}
+                        className="absolute top-2 right-2 text-blue-600 hover:text-blue-800 transition"
+                      >
+                        <FiEdit3 className="w-4 h-4" />
+                      </button>
                     </div>
                   ))
                 )}
@@ -116,23 +166,44 @@ console.log(employees)
         })}
       </div>
 
-      {/* Randevu Ekle Modalı */}
+      {/* Randevu Ekle Modal */}
       <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title="Randevu Ekle">
-      <AppointmentForm
-  customers={customers}
-  employees={employees}
-  onSubmit={handleAddAppointment}
-  onCancel={() => setAddModalOpen(false)}
-  onAddCustomer={() => setCustomerModalOpen(true)}
-/>
+        <AppointmentForm
+          employees={employees}
+          customers={customers}
+          appointments={employees.flatMap((e) => e.appointments || [])}
+          onCancel={() => setAddModalOpen(false)}
+          onSubmit={handleAddAppointment}
+          onAddCustomer={() => setCustomerModalOpen(true)}
+        />
       </Modal>
 
-      {/* Müşteri ekle modalı */}
-      <Modal open={customerModalOpen} onClose={() => setCustomerModalOpen(false)} title="Müşteri Ekle">
-        <CustomerForm
-          onSubmit={handleAddCustomer}
-          onCancel={() => setCustomerModalOpen(false)}
+      {/* Randevu Düzenle Modal */}
+      <Modal
+        open={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false)
+          setEditingAppointment(null)
+        }}
+        title="Randevu Düzenle"
+      >
+        <AppointmentEditForm
+          initialData={editingAppointment}
+          employees={employees}
+          customers={customers}
+          appointments={employees.flatMap((e) => e.appointments || [])}
+          onCancel={() => {
+            setEditModalOpen(false)
+            setEditingAppointment(null)
+          }}
+          onSubmit={handleEditAppointment}
+          onAddCustomer={() => setCustomerModalOpen(true)}
         />
+      </Modal>
+
+      {/* Müşteri Ekle Modal */}
+      <Modal open={customerModalOpen} onClose={() => setCustomerModalOpen(false)} title="Müşteri Ekle">
+        <CustomerForm onSubmit={handleAddCustomer} onCancel={() => setCustomerModalOpen(false)} />
       </Modal>
     </div>
   )
