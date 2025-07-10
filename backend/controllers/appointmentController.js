@@ -24,14 +24,14 @@ exports.createAppointment = async (req, res) => {
     }
 
     // Hizmet kontrolü ve süre hesaplama
-    const serviceIds = services.map(s => s._id || s.serviceId).filter(Boolean);
+    const serviceIds = services.map(s => typeof s === 'string' ? s : s._id || s.serviceId).filter(Boolean);
     const foundServices = await Service.find({ _id: { $in: serviceIds } });
 
     if (foundServices.length !== serviceIds.length) {
       return res.status(400).json({ message: 'Bazı hizmetler bulunamadı.' });
     }
 
-    const totalDuration = duration || foundServices.reduce((sum, svc) => sum + (svc.duration || 30), 0);
+    const totalDuration = foundServices.reduce((sum, svc) => sum + (svc.duration || 30), 0);
     const finalServices = foundServices.map(svc => ({
       _id: svc._id,
       name: svc.name,
@@ -114,6 +114,107 @@ exports.getAllAppointments = async (req, res) => {
     console.error('getAllAppointments error:', error);
     res.status(500).json({
       message: 'Randevular yüklenirken bir hata oluştu.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+// Randevu güncelle
+exports.updateAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { employee, customer, date, time, services = [], notes, duration } = req.body;
+
+    if (!employee || !customer || !date || !time || !services.length) {
+      return res.status(400).json({
+        message: 'Zorunlu alanlar: çalışan, müşteri, tarih, saat ve en az bir hizmet.'
+      });
+    }
+
+    const appointment = await Appointment.findById(id);
+    if (!appointment) {
+      return res.status(404).json({ message: 'Randevu bulunamadı.' });
+    }
+
+    // Hizmetleri doğrula ve süre hesapla
+    const serviceIds = services.map(s => s._id || s.serviceId).filter(Boolean);
+    const foundServices = await Service.find({ _id: { $in: serviceIds } });
+
+    if (foundServices.length !== serviceIds.length) {
+      return res.status(400).json({ message: 'Bazı hizmetler bulunamadı.' });
+    }
+
+    const totalDuration = duration || foundServices.reduce((sum, svc) => sum + (svc.duration || 30), 0);
+    const finalServices = foundServices.map(svc => ({
+      _id: svc._id,
+      name: svc.name,
+      duration: svc.duration
+    }));
+
+    const start = DateTime.fromFormat(`${date} ${time}`, 'yyyy-MM-dd HH:mm');
+    const end = start.plus({ minutes: totalDuration });
+
+    // Çakışma kontrolü (güncellenen randevuyu hariç tut)
+    const existingAppointments = await Appointment.find({
+      employee,
+      date,
+      _id: { $ne: id },
+      status: { $ne: 'cancelled' }
+    });
+
+    const isConflict = existingAppointments.some(app => {
+      const appStart = DateTime.fromFormat(`${app.date} ${app.time}`, 'yyyy-MM-dd HH:mm');
+      const appEnd = appStart.plus({ minutes: app.duration || 30 });
+      return (start < appEnd) && (end > appStart);
+    });
+
+    if (isConflict) {
+      return res.status(400).json({
+        message: 'Bu saat aralığında çalışanın başka bir randevusu var.'
+      });
+    }
+
+    const oldEmployeeId = appointment.employee.toString();
+
+    // Randevuyu güncelle
+    appointment.employee = employee;
+    appointment.customer = customer;
+    appointment.date = date;
+    appointment.time = time;
+    appointment.services = finalServices;
+    appointment.notes = notes;
+    appointment.duration = totalDuration;
+
+    await appointment.save();
+
+    // Eğer çalışan değiştiyse eski çalışandan çıkar, yeni çalışana ekle
+    if (oldEmployeeId !== employee) {
+      await Employee.findByIdAndUpdate(oldEmployeeId, {
+        $pull: { appointments: appointment._id }
+      });
+      await Employee.findByIdAndUpdate(employee, {
+        $addToSet: { appointments: appointment._id }
+      });
+    }
+
+    // Müşteriyi de güncelle (gerekirse)
+    await Customer.findByIdAndUpdate(customer, {
+      $addToSet: { appointments: appointment._id }
+    });
+
+    // Populated veri döndür
+    const populated = await Appointment.findById(appointment._id)
+      .populate('customer', 'name email phone')
+      .populate('employee', 'name role');
+
+    res.status(200).json({
+      message: 'Randevu başarıyla güncellendi.',
+      data: populated
+    });
+
+  } catch (error) {
+    console.error('updateAppointment error:', error);
+    res.status(500).json({
+      message: 'Randevu güncellenirken bir hata oluştu.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

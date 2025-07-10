@@ -37,7 +37,6 @@ const appointmentSchema = new mongoose.Schema({
   duration: {
     type: Number,
     required: true,
-    min: 5 // minimum 5 dakika
   },
   notes: {
     type: String,

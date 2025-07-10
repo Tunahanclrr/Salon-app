@@ -7,7 +7,7 @@ import { fetchServices } from '../redux/servicesSlice'
 import { addAppointment, updateAppointment } from '../redux/appointmentsSlice'
 import Modal from '../components/Modal'
 import AppointmentForm from '../components/AppointmentForm'
-import AppointmentEditForm from '../components/AppointmentEditForm'
+import AppointmentEditForm from '../components/AppointmenEditForm'
 import CustomerForm from '../components/CustomerForm'
 import { toast } from 'react-toastify'
 
@@ -18,7 +18,7 @@ const Appointments = () => {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [customerModalOpen, setCustomerModalOpen] = useState(false)
   const [editingAppointment, setEditingAppointment] = useState(null)
-
+  const services = useSelector(state => state.services.items); // üst kısma ekle (zaten redux'tan çekilmiş olmalı)
   const employees = useSelector(state => state.employees.items)
   const customers = useSelector(state => state.customers.items)
 
@@ -31,21 +31,29 @@ const Appointments = () => {
   const getAppointmentsForEmployee = (employee) =>
     (employee.appointments || []).filter(app => app.date === selectedDate)
 
-  // Yeni Randevu Ekleme
+  // Yeni Randevu Eklemey
   const handleAddAppointment = async (formData) => {
     try {
-      const result = await dispatch(addAppointment(formData))
+      const result = await dispatch(addAppointment(formData));
+  
       if (addAppointment.fulfilled.match(result)) {
-        toast.success('Randevu başarıyla oluşturuldu')
-        setAddModalOpen(false)
-        await Promise.all([dispatch(fetchEmployees()), dispatch(fetchCustomers())])
+        toast.success('Randevu başarıyla oluşturuldu');
+        setAddModalOpen(false);
+  
+        // Gerekli verileri ayrı ayrı await ile çek
+        await dispatch(fetchEmployees());
+        await dispatch(fetchCustomers());
+        await dispatch(fetchServices()); // servisler de değişmiş olabilir
       } else {
-        toast.error(result.payload || 'Randevu oluşturulamadı')
+        const errorMessage = result.payload || 'Randevu oluşturulamadı';
+        toast.error(errorMessage);
       }
     } catch (error) {
-      toast.error('Beklenmeyen bir hata oluştu')
+      console.error('Randevu oluşturma hatası:', error);
+      toast.error('Beklenmeyen bir hata oluştu');
     }
-  }
+  };
+  
 
   // Randevu Düzenleme
   const handleEditAppointment = async (formData) => {
@@ -63,6 +71,10 @@ const Appointments = () => {
       toast.error('Beklenmeyen hata oluştu')
     }
   }
+  useEffect(() => {
+    console.log('Employees güncellendi:', employees);
+  }, [employees]);
+  
 
   // Müşteri Ekleme
   const handleAddCustomer = async (form) => {
@@ -168,16 +180,19 @@ const Appointments = () => {
 
       {/* Randevu Ekle Modal */}
       <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title="Randevu Ekle">
-        <AppointmentForm
-          employees={employees}
-          customers={customers}
-          appointments={employees.flatMap((e) => e.appointments || [])}
-          onCancel={() => setAddModalOpen(false)}
-          onSubmit={handleAddAppointment}
-          onAddCustomer={() => setCustomerModalOpen(true)}
-        />
+      <AppointmentEditForm
+  initialData={editingAppointment}
+  employees={employees}
+  customers={customers}
+  appointments={employees.flatMap((e) => e.appointments || [])}
+  onCancel={() => {
+    setEditModalOpen(false)
+    setEditingAppointment(null)
+  }}
+  onSubmit={handleEditAppointment}
+  onAddCustomer={() => setCustomerModalOpen(true)}
+/>
       </Modal>
-
       {/* Randevu Düzenle Modal */}
       <Modal
         open={editModalOpen}
@@ -187,18 +202,19 @@ const Appointments = () => {
         }}
         title="Randevu Düzenle"
       >
-        <AppointmentEditForm
-          initialData={editingAppointment}
-          employees={employees}
-          customers={customers}
-          appointments={employees.flatMap((e) => e.appointments || [])}
-          onCancel={() => {
-            setEditModalOpen(false)
-            setEditingAppointment(null)
-          }}
-          onSubmit={handleEditAppointment}
-          onAddCustomer={() => setCustomerModalOpen(true)}
-        />
+      <AppointmentEditForm
+  initialData={editingAppointment}
+  employees={employees}
+  customers={customers}
+  services={services} // <--- BU SATIR EKSİK, EKLİYORSUN
+  appointments={employees.flatMap((e) => e.appointments || [])}
+  onCancel={() => {
+    setEditModalOpen(false)
+    setEditingAppointment(null)
+  }}
+  onSubmit={handleEditAppointment}
+  onAddCustomer={() => setCustomerModalOpen(true)}
+/>
       </Modal>
 
       {/* Müşteri Ekle Modal */}

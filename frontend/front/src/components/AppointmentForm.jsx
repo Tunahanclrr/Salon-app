@@ -186,6 +186,7 @@ export default function AppointmentForm({ employees, customers, appointments, on
       });
     }
 
+    
     return availableSlots;
   }, [form.employeeId, form.date, form.selectedServices, appointments]);
 
@@ -194,12 +195,15 @@ export default function AppointmentForm({ employees, customers, appointments, on
       <div>
         <label className="block text-sm font-medium text-gray-700">Müşteri</label>
         <Select
-          options={filteredCustomers.map(c=>({value:c._id,label:c.name}))}
-          onChange={(opt) => setForm({...form, customerId: opt?.value || '' })}
-          placeholder="Müşteri ara / seç..."
-          isClearable
-          required
-        />
+  options={customerOptions}
+  onInputChange={(value) => setCustomerSearch(value)}
+  onChange={(opt) => setForm({ ...form, customerId: opt?.value || '' })}
+  placeholder="Müşteri ara / seç..."
+  isClearable
+  filterOption={(option, inputValue) =>
+    option.label.toLowerCase().includes(inputValue.toLowerCase())
+  }
+/>
         <button
           type="button"
           className="bg-green-500 text-white px-3 rounded hover:bg-green-600"
