@@ -3,10 +3,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import Select from 'react-select';
 import { fetchServices } from '../redux/servicesSlice';
 
-export default function AppointmentForm({ employees, customers, appointments, onCancel, onSubmit, onAddCustomer }) {
+export default function AppointmentForm({ employees, customers, appointments, onCancel, onSubmit, onAddCustomer, initialData = null }) {
   const dispatch = useDispatch();
   const { items: services, loading } = useSelector(state => state.services);
-  
+
   const [form, setForm] = useState({
     employeeId: '',
     customerId: '',
@@ -15,14 +15,32 @@ export default function AppointmentForm({ employees, customers, appointments, on
     selectedServices: [],
     notes: '',
   });
-  
-  const [availableTimes, setAvailableTimes] = useState([]);
+
   const [totalDuration, setTotalDuration] = useState(0);
   const [customerSearch, setCustomerSearch] = useState('');
 
   useEffect(() => {
     dispatch(fetchServices());
   }, [dispatch]);
+
+  // initialData değiştiğinde formu güncelle
+  useEffect(() => {
+    if (initialData) {
+      setForm(prev => ({
+        ...prev,
+        employeeId: initialData.employeeId || prev.employeeId,
+        date: initialData.date || prev.date,
+        time: initialData.time || prev.time,
+        // Eğer initialData'da serviceId varsa seçili hizmetlere ekle
+        selectedServices: initialData.serviceId ? [services.find(s => s._id === initialData.serviceId)].filter(Boolean).map(svc => ({
+          value: svc._id,
+          label: `${svc.name} (${svc.duration} dk)`,
+          duration: svc.duration
+        })) : prev.selectedServices,
+      }));
+    }
+  }, [initialData, services]);
+
 
   // Hizmet seçimi değiştiğinde toplam süreyi güncelle
   useEffect(() => {
@@ -32,24 +50,9 @@ export default function AppointmentForm({ employees, customers, appointments, on
     setTotalDuration(duration);
   }, [form.selectedServices]);
 
-  // Müsait saatleri hesapla
-  useEffect(() => {
-    if (!form.employeeId || !form.date) return;
-    
-    const fetchBusySlots = async () => {
-      // Burada API'den çalışanın meşgul olduğu saatleri çekebilirsiniz
-      // Örnek:
-      // const { data } = await axios.get(`/api/employees/${form.employeeId}/busy-slots?date=${form.date}`);
-      // setBusySlots(data);
-    };
-    
-    fetchBusySlots();
-  }, [form.employeeId, form.date]);
-
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    // Zorunlu alanları kontrol et
+
     if (form.selectedServices.length === 0) {
       alert('Lütfen en az bir hizmet seçin');
       return;
@@ -60,28 +63,26 @@ export default function AppointmentForm({ employees, customers, appointments, on
       return;
     }
 
-    // Hizmet verilerini hazırla
-    const selectedServices = form.selectedServices.map(svc => ({
+    const selectedServicesForPayload = form.selectedServices.map(svc => ({
       _id: svc.value,
       name: svc.label.split(' (')[0],
       duration: svc.duration,
-      price: svc.price
+      // price alanını backend'e göndermek isteyebilirsin
+      // price: services.find(s => s._id === svc.value)?.price || 0
     }));
 
-    // Toplam süreyi hesapla
-    const calculatedDuration = selectedServices.reduce((total, svc) => total + (svc.duration || 30), 0);
+    const calculatedDuration = selectedServicesForPayload.reduce((total, svc) => total + (svc.duration || 30), 0);
 
-    // Backend'e gönderilecek veriyi hazırla
     const payload = {
       customerId: form.customerId,
-      employee: form.employeeId,
+      employee: form.employeeId, // Backend'e sadece ID gönderiyoruz
       date: form.date,
       time: form.time,
-      services: selectedServices,
+      services: selectedServicesForPayload.map(svc => svc._id), // Sadece hizmet ID'lerini gönder
       duration: calculatedDuration,
       notes: form.notes || undefined
     };
-    
+
     console.log('Gönderilen veri:', payload);
     onSubmit(payload);
   };
@@ -89,7 +90,8 @@ export default function AppointmentForm({ employees, customers, appointments, on
   const serviceOptions = services.map(svc => ({
     value: svc._id,
     label: `${svc.name} (${svc.duration} dk)`,
-    duration: svc.duration
+    duration: svc.duration,
+    price: svc.price
   }));
 
   const employeeOptions = employees.map(emp => ({
@@ -102,21 +104,19 @@ export default function AppointmentForm({ employees, customers, appointments, on
     label: `${cust.name} - ${cust.phone}`
   }));
 
-  const filteredCustomers = customers.filter((c) =>
-    c.name?.toLowerCase().includes(customerSearch.toLowerCase())
-  );
+  const filteredCustomerOptions = useMemo(() => {
+    return customerOptions.filter((c) =>
+      c.label.toLowerCase().includes(customerSearch.toLowerCase())
+    );
+  }, [customerSearch, customerOptions]);
 
   const timeOptions = useMemo(() => {
-    if (!form.employeeId || !form.date || form.selectedServices.length === 0) return [];
-    
-    // Toplam süreyi hesapla
-    const totalDuration = form.selectedServices.reduce((total, svc) => total + (svc.duration || 30), 0);
-    
-    // Çalışma saatleri (09:00 - 20:00 arası, 15 dakikalık aralıklarla)
+    if (!form.employeeId || !form.date || totalDuration === 0) return [];
+
     const startHour = 9;
     const endHour = 20;
-    const interval = 15; // dakika
-    
+    const interval = 15;
+
     const times = [];
     for (let h = startHour; h < endHour; h++) {
       for (let m = 0; m < 60; m += interval) {
@@ -125,60 +125,48 @@ export default function AppointmentForm({ employees, customers, appointments, on
       }
     }
 
-    // Seçili çalışanın o günkü randevularını al
     const employeeAppointments = appointments.filter(
-      app => app.employee?._id === form.employeeId && 
-             app.date === form.date &&
-             app.status !== 'cancelled'
+      app => app.employee?._id === form.employeeId &&
+        app.date === form.date &&
+        app.status !== 'cancelled'
     );
 
-    // Meşgul saatleri kontrol et
-    const isTimeSlotAvailable = (time) => {
-      const [startHour, startMinute] = time.split(':').map(Number);
-      const slotStart = new Date(0, 0, 0, startHour, startMinute);
+    const isTimeSlotAvailable = (timeSlot) => {
+      const [startHourSlot, startMinuteSlot] = timeSlot.split(':').map(Number);
+      const slotStart = new Date(0, 0, 0, startHourSlot, startMinuteSlot);
       const slotEnd = new Date(slotStart.getTime() + totalDuration * 60000);
 
-      // Çalışma saatleri dışına çıkıyor mu kontrol et (20:00'e kadar)
-      const endOfDay = new Date(0, 0, 0, 20, 0, 0); // 20:00
+      const endOfDay = new Date(0, 0, 0, 20, 0, 0);
       if (slotEnd > endOfDay) return false;
 
-      // Diğer randevularla çakışıyor mu kontrol et
       return !employeeAppointments.some(app => {
         if (!app.time) return false;
-        
+
         const [appHour, appMinute] = app.time.split(':').map(Number);
         const appStart = new Date(0, 0, 0, appHour, appMinute);
         const appEnd = new Date(appStart.getTime() + (app.duration || 30) * 60000);
-        
-        // Çakışma kontrolü:
-        // Eğer yeni randevunun başlangıcı veya bitişi mevcut randevu aralığındaysa
-        // VEYA yeni randevu mevcut randevuyu tamamen kapsıyorsa
+
         return (
-          (slotStart >= appStart && slotStart < appEnd) || // Yeni randevu başlangıcı mevcut randevu içinde
-          (slotEnd > appStart && slotEnd <= appEnd) ||    // Yeni randevu bitişi mevcut randevu içinde
-          (slotStart <= appStart && slotEnd >= appEnd)    // Yeni randevu mevcut randevuyu tamamen kapsıyor
+          (slotStart >= appStart && slotStart < appEnd) ||
+          (slotEnd > appStart && slotEnd <= appEnd) ||
+          (slotStart <= appStart && slotEnd >= appEnd)
         );
       });
     };
 
-    // Uygun zaman aralıklarını oluştur
     const availableSlots = [];
-    
     for (let i = 0; i < times.length; i++) {
       const time = times[i];
       const [hour, minute] = time.split(':').map(Number);
       const slotStart = new Date(0, 0, 0, hour, minute);
       const slotEnd = new Date(slotStart.getTime() + totalDuration * 60000);
-      
-      // Eğer bu zaman aralığı çalışma saatleri dışına çıkıyorsa atla
-      if (slotEnd > new Date(0, 0, 0, 20, 0, 0)) continue;
-      
-      const isAvailable = isTimeSlotAvailable(time);
       const endTimeStr = `${slotEnd.getHours().toString().padStart(2, '0')}:${slotEnd.getMinutes().toString().padStart(2, '0')}`;
-      
+
+      const isAvailable = isTimeSlotAvailable(time);
+
       availableSlots.push({
         value: time,
-        label: isAvailable 
+        label: isAvailable
           ? `${time} - ${endTimeStr} (${totalDuration} dk)`
           : `${time} - Dolu`,
         isDisabled: !isAvailable,
@@ -186,27 +174,24 @@ export default function AppointmentForm({ employees, customers, appointments, on
       });
     }
 
-    
     return availableSlots;
-  }, [form.employeeId, form.date, form.selectedServices, appointments]);
+  }, [form.employeeId, form.date, form.selectedServices, appointments, totalDuration]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700">Müşteri</label>
         <Select
-  options={customerOptions}
-  onInputChange={(value) => setCustomerSearch(value)}
-  onChange={(opt) => setForm({ ...form, customerId: opt?.value || '' })}
-  placeholder="Müşteri ara / seç..."
-  isClearable
-  filterOption={(option, inputValue) =>
-    option.label.toLowerCase().includes(inputValue.toLowerCase())
-  }
-/>
+          options={filteredCustomerOptions}
+          onInputChange={(value) => setCustomerSearch(value)}
+          onChange={(opt) => setForm({ ...form, customerId: opt?.value || '' })}
+          placeholder="Müşteri ara / seç..."
+          isClearable
+          value={customerOptions.find(opt => opt.value === form.customerId) || null}
+        />
         <button
           type="button"
-          className="bg-green-500 text-white px-3 rounded hover:bg-green-600"
+          className="mt-2 bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-sm"
           onClick={onAddCustomer}
         >
           + Yeni Müşteri
@@ -217,10 +202,11 @@ export default function AppointmentForm({ employees, customers, appointments, on
         <label className="block text-sm font-medium text-gray-700">Çalışan</label>
         <Select
           options={employeeOptions}
-          onChange={(opt) => setForm({...form, employeeId: opt?.value || '' })}
+          onChange={(opt) => setForm({ ...form, employeeId: opt?.value || '' })}
           placeholder="Çalışan seçin..."
           isClearable
           required
+          value={employeeOptions.find(opt => opt.value === form.employeeId) || null}
         />
       </div>
 
@@ -238,12 +224,12 @@ export default function AppointmentForm({ employees, customers, appointments, on
             required
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700">Saat</label>
           <Select
             options={timeOptions}
-            value={form.time ? { value: form.time, label: form.time } : null}
+            value={timeOptions.find(opt => opt.value === form.time) || null}
             onChange={(opt) => setForm(prev => ({ ...prev, time: opt?.value || '' }))}
             placeholder="Saat seçin..."
             isClearable
@@ -252,6 +238,7 @@ export default function AppointmentForm({ employees, customers, appointments, on
             noOptionsMessage={() => "Uygun zaman aralığı bulunamadı"}
             className="react-select-container"
             classNamePrefix="react-select"
+            isOptionDisabled={(option) => option.isDisabled}
             styles={{
               option: (provided, state) => ({
                 ...provided,
@@ -276,12 +263,13 @@ export default function AppointmentForm({ employees, customers, appointments, on
           isMulti
           options={serviceOptions}
           value={form.selectedServices}
-          onChange={(selected) => setForm({...form, selectedServices: selected || []})}
+          onChange={(selected) => setForm({ ...form, selectedServices: selected || [] })}
           placeholder="Hizmet seçin..."
           className="react-select-container"
           classNamePrefix="react-select"
           isLoading={loading}
           closeMenuOnSelect={false}
+          required
         />
       </div>
 
@@ -289,7 +277,7 @@ export default function AppointmentForm({ employees, customers, appointments, on
         <label className="block text-sm font-medium text-gray-700">Notlar</label>
         <textarea
           value={form.notes}
-          onChange={(e) => setForm({...form, notes: e.target.value})}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           rows={3}
         />

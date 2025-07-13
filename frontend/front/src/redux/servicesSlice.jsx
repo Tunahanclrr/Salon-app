@@ -6,6 +6,19 @@ export const fetchServices = createAsyncThunk('services/fetch', async ()=>{
   return data;
 });
 
+export const addService = createAsyncThunk(
+  'services/addService',
+  async (service, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.post('http://localhost:4000/api/createService', service);
+      return data;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Sunucu hatası';
+      return rejectWithValue(msg);
+    }
+  }
+);
+
 const servicesSlice = createSlice({
     name: 'services',
     initialState: {

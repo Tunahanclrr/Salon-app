@@ -1,4 +1,22 @@
+/* index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Custom CSS for the calendar grid */
+.grid-container {
+  display: grid;
+  /* İlk sütun saatler için, diğerleri çalışanlar için dinamik */
+  grid-template-columns: 60px repeat(var(--employee-count), minmax(150px, 1fr));
+  position: relative;
+  height: 100%; /* or a fixed height with overflow-y-auto */
+}
+
+/* Her 15 dakikalık dilim için yükseklik */
+.h-5 { /* 20px - Eğer gridde 15 dakikalık aralığın yüksekliği 20px ise */
+  height: 20px;
+}
+
+/* Randevuların konumu ve yüksekliği JS ile dinamik olarak set edilecek */
+/* .absolute randevu blokları için */
+/* .relative konteyner için */
