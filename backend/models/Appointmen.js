@@ -54,14 +54,6 @@ const appointmentSchema = new mongoose.Schema({
 });
 
 // Tarih ve saat birleşimi için bileşik unique index
-try {
-  appointmentSchema.index(
-    { employee: 1, date: 1, time: 1 },
-    { unique: true, name: 'appointment_slot' }
-  );
-} catch (error) {
-  console.warn('Index oluşturulurken hata:', error.message);
-}
 
 // Toplam tutarı hesaplayan virtual alan (isteğe bağlı)
 appointmentSchema.virtual('totalPrice').get(function() {

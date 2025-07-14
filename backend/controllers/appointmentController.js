@@ -7,10 +7,10 @@ const Service = require('../models/Services');
 // Randevu oluştur
 exports.createAppointment = async (req, res) => {
   try {
-    const { employee, customer, customerId, date, time, services = [], notes, duration } = req.body;
+    const { employee, customer, customerId, date, time, services = [], notes, duration, force = false } = req.body;
     const customerFinal = customer || customerId;
 
-    // Gerekli alanlar
+    // Gerekli alan kontrolü
     if (!employee || !customerFinal || !date || !time || !services.length) {
       return res.status(400).json({
         message: 'Zorunlu alanlar: çalışan, müşteri, tarih, saat ve en az bir hizmet.'
@@ -55,13 +55,15 @@ exports.createAppointment = async (req, res) => {
       return (start < appEnd) && (end > appStart);
     });
 
-    if (isConflict) {
+    // Burada çakışma var ve force yoksa hata dön
+    if (isConflict && !force) {
       return res.status(400).json({
-        message: 'Bu saat aralığında çalışanın başka bir randevusu var.'
+        message: 'Bu saat aralığında çalışanın başka bir randevusu var.',
+        conflict: true
       });
     }
 
-    // Yeni randevuyu oluştur
+    // Çakışma olsa bile force varsa devam et
     const newAppointment = new Appointment({
       employee,
       customer: customerFinal,
@@ -75,7 +77,7 @@ exports.createAppointment = async (req, res) => {
 
     await newAppointment.save();
 
-    // Çalışan ve müşteri randevu güncellemesi
+    // Çalışan ve müşteri güncellemesi
     await Employee.findByIdAndUpdate(employee, {
       $push: { appointments: newAppointment._id }
     });
@@ -83,7 +85,6 @@ exports.createAppointment = async (req, res) => {
       $push: { appointments: newAppointment._id }
     });
 
-    // Populate ile geri döndür
     const populated = await Appointment.findById(newAppointment._id)
       .populate('customer', 'name email phone')
       .populate('employee', 'name role');
@@ -92,6 +93,7 @@ exports.createAppointment = async (req, res) => {
       message: 'Randevu başarıyla oluşturuldu.',
       data: populated
     });
+
   } catch (error) {
     console.error('createAppointment error:', error);
     res.status(500).json({
@@ -100,6 +102,7 @@ exports.createAppointment = async (req, res) => {
     });
   }
 };
+
 
 // Tüm randevuları getir
 exports.getAllAppointments = async (req, res) => {
@@ -122,7 +125,7 @@ exports.getAllAppointments = async (req, res) => {
 exports.updateAppointment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { employee, customer, date, time, services = [], notes, duration } = req.body;
+    const { employee, customer, date, time, services = [], notes, duration, force = false } = req.body;
 
     if (!employee || !customer || !date || !time || !services.length) {
       return res.status(400).json({
@@ -167,9 +170,11 @@ exports.updateAppointment = async (req, res) => {
       return (start < appEnd) && (end > appStart);
     });
 
-    if (isConflict) {
+    // ❗ force kontrolü burada yapılır
+    if (isConflict && !force) {
       return res.status(400).json({
-        message: 'Bu saat aralığında çalışanın başka bir randevusu var.'
+        message: 'Bu saat aralığında çalışanın başka bir randevusu var.',
+        conflict: true
       });
     }
 
@@ -196,12 +201,11 @@ exports.updateAppointment = async (req, res) => {
       });
     }
 
-    // Müşteriyi de güncelle (gerekirse)
+    // Müşteri ilişkisini de güncelle
     await Customer.findByIdAndUpdate(customer, {
       $addToSet: { appointments: appointment._id }
     });
 
-    // Populated veri döndür
     const populated = await Appointment.findById(appointment._id)
       .populate('customer', 'name email phone')
       .populate('employee', 'name role');
@@ -215,6 +219,35 @@ exports.updateAppointment = async (req, res) => {
     console.error('updateAppointment error:', error);
     res.status(500).json({
       message: 'Randevu güncellenirken bir hata oluştu.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Randevuyu sil
+exports.deleteAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const appointment = await Appointment.findById(id);
+    if (!appointment) {
+      return res.status(404).json({ message: 'Randevu bulunamadı.' });
+    }
+
+    await appointment.remove();
+
+    // Çalışan ve müşteri ilişkilerini de güncelle
+    await Employee.findByIdAndUpdate(appointment.employee, {
+      $pull: { appointments: appointment._id }
+    });
+    await Customer.findByIdAndUpdate(appointment.customer, {
+      $pull: { appointments: appointment._id }
+    });
+
+    res.status(200).json({ message: 'Randevu başarıyla silindi.' });
+  } catch (error) {
+    console.error('deleteAppointment error:', error);
+    res.status(500).json({
+      message: 'Randevu silinirken bir hata oluştu.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
