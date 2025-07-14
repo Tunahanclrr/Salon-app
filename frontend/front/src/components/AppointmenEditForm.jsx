@@ -22,7 +22,9 @@ export default function AppointmentEditForm({
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [serviceDuration, setServiceDuration] = useState(0);
-
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(null); // Modalda onay bekleyen submit verisi
+  
   // initialData değiştiğinde formu ve serviceDuration'ı ayarla
   useEffect(() => {
     if (initialData) {
@@ -66,37 +68,76 @@ export default function AppointmentEditForm({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+  
     const requiredFields = ['customerId', 'employeeId', 'date', 'time', 'serviceId'];
-    const hasEmpty = requiredFields.some((field) => !form[field]); // .trim() kaldırdık, çünkü boş string zaten false döner
+    const hasEmpty = requiredFields.some((field) => !form[field]);
+  
     if (hasEmpty) {
       alert('Tüm alanları doldurunuz.');
       return;
     }
-
+  
     // Seçilen hizmet nesnesini bul
     const selectedService = services.find((s) => s._id === form.serviceId);
-
     if (!selectedService) {
-        alert('Lütfen bir hizmet seçin.');
-        return;
+      alert('Lütfen bir hizmet seçin.');
+      return;
     }
 
-    onSubmit({
-      employee: form.employeeId,
-      customer: form.customerId,
-      date: form.date,
-      time: form.time,
-      services: [{ // Tek bir hizmet ID'si ile gönderiyoruz
-        _id: selectedService._id,
-        name: selectedService.name,
-        duration: selectedService.duration,
-        price: selectedService.price,
-      }],
-      duration: serviceDuration, // Buraya serviceDuration'ı gönderiyoruz
-      notes: form.notes,
-    });
-  };
+    const payload = {
+        employee: form.employeeId,
+        customer: form.customerId,
+        date: form.date,
+        time: form.time,
+        services: [{
+          _id: selectedService._id,
+          name: selectedService.name,
+          duration: selectedService.duration,
+          price: selectedService.price,
+        }],
+        duration: serviceDuration,
+        notes: form.notes,
+        force: false, // Varsayılan olarak force false
+    };
+  
+    // Eğer seçilen saat doluysa, modal sor
+    // isTimeSlotAvailable fonksiyonunu kullanarak kontrol et
+    const [sh, sm] = form.time.split(':').map(Number);
+    const slotStart = new Date(0, 0, 0, sh, sm);
+    const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60000);
 
+    const employeeAppointments = appointments.filter(
+        (app) =>
+            app.employee?._id === form.employeeId &&
+            app.date === form.date &&
+            app._id !== initialData?._id && // Düzenlenen randevuyu hariç tut
+            app.status !== "cancelled"
+    );
+
+    const isConflicting = employeeAppointments.some((app) => {
+        if (!app.time) return false;
+
+        const [ah, am] = app.time.split(':').map(Number);
+        const appStart = new Date(0, 0, 0, ah, am);
+        const appEnd = new Date(appStart.getTime() + (app.duration || 30) * 60000);
+
+        return (
+            (slotStart >= appStart && slotStart < appEnd) ||
+            (slotEnd > appStart && slotEnd <= appEnd) ||
+            (slotStart <= appStart && slotEnd >= appEnd)
+        );
+    });
+    
+    if (isConflicting) {
+      setPendingSubmit(payload); // Çakışma durumunda payload'u sakla
+      setShowConfirmModal(true); // Onay modalını göster
+      return;
+    }
+  
+    // Saat uygunsa direkt gönder
+    onSubmit(payload);
+  };
+  
   const customerOptions = customers.map((c) => ({
     value: c._id,
     label: `${c.name} - ${c.phone || ''}`,
@@ -115,61 +156,77 @@ export default function AppointmentEditForm({
 
 
   const timeOptions = useMemo(() => {
-    // serviceDuration 0 ise ve bu 0, bir hizmetin gerçek süresi değilse, saat seçeneklerini gösterme.
-    // Eğer serviceDuration 0 ve form.serviceId boşsa, henüz hizmet seçilmemiştir.
-    if (!form.employeeId || !form.date || (serviceDuration === 0 && form.serviceId === '')) return [];
-
+    if (!form.employeeId || !form.date || serviceDuration === 0) return [];
+  
     const startHour = 9;
     const endHour = 20;
     const interval = 15;
-
-    const employeeAppointments = appointments.filter(
-      (a) =>
-        a.employee?._id === form.employeeId &&
-        a.date === form.date &&
-        a._id !== initialData?._id // güncellenen randevuyu hariç tut
-    );
-
+  
     const times = [];
-
     for (let h = startHour; h < endHour; h++) {
       for (let m = 0; m < 60; m += interval) {
-        const hourStr = h.toString().padStart(2, '0');
-        const minStr = m.toString().padStart(2, '0');
-        const time = `${hourStr}:${minStr}`;
-
-        const start = new Date(0, 0, 0, h, m);
-        const end = new Date(start.getTime() + serviceDuration * 60000);
-
-        const endHourLimit = new Date(0, 0, 0, 20, 0); // 20:00'dan sonra randevu olmasın
-        if (end > endHourLimit) continue;
-
-        const isConflict = employeeAppointments.some((a) => {
-          if (!a.time || !a.duration) return false;
-
-          const [ah, am] = a.time.split(':').map(Number);
-          const aStart = new Date(0, 0, 0, ah, am);
-          const aEnd = new Date(aStart.getTime() + a.duration * 60000);
-
-          return (
-            (start >= aStart && start < aEnd) ||
-            (end > aStart && end <= aEnd) ||
-            (start <= aStart && end >= aEnd)
-          );
-        });
-
-        times.push({
-          value: time,
-          label: isConflict
-            ? `${time} - Dolu`
-            : `${time} - ${new Date(0, 0, 0, end.getHours(), end.getMinutes()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${serviceDuration} dk)`,
-          isDisabled: isConflict,
-        });
+        const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        times.push(time);
       }
     }
-
-    return times;
-  }, [form.employeeId, form.date, serviceDuration, appointments, initialData]);
+  
+    const employeeAppointments = appointments.filter(
+      (app) =>
+        app.employee?._id === form.employeeId &&
+        app.date === form.date &&
+        app._id !== initialData?._id && // düzenlenen randevuyu hariç tut
+        app.status !== "cancelled"
+    );
+  
+    const isTimeSlotAvailable = (timeSlot) => {
+      const [sh, sm] = timeSlot.split(':').map(Number);
+      const slotStart = new Date(0, 0, 0, sh, sm);
+      const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60000);
+  
+      const endOfDay = new Date(0, 0, 0, 20, 0); // Kapanış saati 20:00
+      if (slotEnd > endOfDay) return false;
+  
+      return !employeeAppointments.some((app) => {
+        if (!app.time) return false;
+  
+        const [ah, am] = app.time.split(':').map(Number);
+        const appStart = new Date(0, 0, 0, ah, am);
+        const appEnd = new Date(appStart.getTime() + (app.duration || 30) * 60000);
+  
+        return (
+          (slotStart >= appStart && slotStart < appEnd) ||
+          (slotEnd > appStart && slotEnd <= appEnd) ||
+          (slotStart <= appStart && slotEnd >= appEnd)
+        );
+      });
+    };
+  
+    return times.map((time) => {
+      const [hour, minute] = time.split(':').map(Number);
+      const slotStart = new Date(0, 0, 0, hour, minute);
+      const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60000);
+      const endTimeStr = `${slotEnd.getHours().toString().padStart(2, '0')}:${slotEnd.getMinutes().toString().padStart(2, '0')}`;
+  
+      const isAvailable = isTimeSlotAvailable(time);
+      // isOptionDisabled artık Select bileşeninin kendi prop'u tarafından yönetilecek,
+      // burada isDisabled her zaman false olacak ki Select'te seçilebilir olsun.
+      // Ancak label'da dolu bilgisi verilecek.
+      return {
+        value: time,
+        label: isAvailable
+          ? `${time} - ${endTimeStr} (${serviceDuration} dk)`
+          : `${time} - ${endTimeStr} (${serviceDuration} dk) - dolu`, // Dolu bilgisini label'a ekledik
+        isDisabled: false, // Artık Select içinde disable edilmeyecek
+      };
+    });
+  }, [
+    form.employeeId,
+    form.date,
+    serviceDuration,
+    appointments,
+    initialData,
+  ]);
+  
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -225,7 +282,7 @@ export default function AppointmentEditForm({
             value={timeOptions.find(opt => String(opt.value) === String(form.time)) || null}
             onChange={(opt) => setForm((prev) => ({ ...prev, time: opt?.value || '' }))}
             isDisabled={!form.employeeId || !form.date || (serviceDuration === 0 && form.serviceId === '')}
-            isOptionDisabled={(option) => option.isDisabled}
+            // isOptionDisabled artık kullanılmıyor, tüm seçenekler seçilebilir
             placeholder="Saat seçin..."
             isClearable
           />
@@ -237,13 +294,13 @@ export default function AppointmentEditForm({
         <label className="block font-medium mb-1">Hizmet</label>
         <select
           name="serviceId"
-          value={form.serviceId} // String'e çevirme kaldırıldı, doğrudan kullanabiliriz.
+          value={form.serviceId}
           onChange={handleChange}
           className="w-full p-2 border rounded"
         >
           <option value="">Seçiniz</option>
           {(services || []).map((s) => (
-            <option key={s._id} value={s._id}> {/* Value'yu doğrudan kullanıyoruz */}
+            <option key={s._id} value={s._id}>
               {s.name} ({s.duration} dk)
             </option>
           ))}
@@ -271,6 +328,35 @@ export default function AppointmentEditForm({
           Güncelle
         </button>
       </div>
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-md max-w-sm w-full space-y-4">
+            <h2 className="text-lg font-semibold">Uyarı</h2>
+            <p>Seçtiğiniz saat dolu görünüyor. Yine de bu saatte güncellemek istiyor musunuz?</p>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  onSubmit({ ...pendingSubmit, force: true }); // force burada true oldu!
+                  setShowConfirmModal(false);
+                  setPendingSubmit(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded"
+              >
+                Evet, eminim
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setPendingSubmit(null);
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded"
+              >
+                Vazgeç
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
