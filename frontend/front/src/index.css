@@ -5,15 +5,22 @@
 
 .calendar-grid-container {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
 }
 
 .calendar-header-grid {
+  display: grid;
+  min-width: max-content;
   grid-template-columns: minmax(50px, auto) repeat(var(--employee-count), minmax(100px, 1fr));
+  width: 100%;
 }
 
 .calendar-body-grid {
   display: grid;
-  grid-template-columns: 60px repeat(var(--employee-count), 1fr);
+  min-width: max-content;
+  grid-template-columns: 60px repeat(var(--employee-count), minmax(100px, 1fr));
+  width: 100%;
 }
 
 .time-column-sticky {
@@ -21,6 +28,25 @@
   left: 0;
   z-index: 10;
   background-color: white;
-  border-right: 1px solid #e5e7eb; /* border-gray-200 */
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+  border-right: 1px solid #e5e7eb;
+  box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobil cihazlar için özel stiller */
+@media (max-width: 767px) {
+  .calendar-grid-container {
+    overflow-x: scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .calendar-header-grid,
+  .calendar-body-grid {
+    min-width: max-content;
+    width: auto;
+  }
+  
+  .calendar-header-grid > div,
+  .calendar-body-grid > div {
+    min-width: 100px;
+  }
 }

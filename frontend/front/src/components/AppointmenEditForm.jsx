@@ -16,50 +16,55 @@ export default function AppointmentEditForm({
     employeeId: '',
     date: '',
     time: '',
-    serviceId: '', // Tek bir hizmet için _id tutuyoruz
+    selectedServices: [],
     notes: '',
   });
+
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [totalDuration, setTotalDuration] = useState(0);
+  const [totalPrice, setTotalPrice] = useState(0);
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [serviceDuration, setServiceDuration] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(null); // Modalda onay bekleyen submit verisi
   
-  // initialData değiştiğinde formu ve serviceDuration'ı ayarla
+  // initialData değiştiğinde formu ayarla
   useEffect(() => {
     if (initialData) {
-      const initialServiceId = initialData.services?.[0]?._id || '';
+      const selectedServices = initialData.services?.map(service => ({
+        value: service._id,
+        label: `${service.name} (${service.duration} dk - ${service.price} TL)`,
+        duration: service.duration,
+        price: service.price
+      })) || [];
+
       setForm({
         customerId: initialData.customer?._id || '',
         employeeId: initialData.employee?._id || '',
         date: initialData.date || '',
         time: initialData.time || '',
-        serviceId: initialServiceId,
+        selectedServices,
         notes: initialData.notes || '',
       });
 
-      // Hizmet ID'si set edildiğinde süreyi de hemen bul ve ayarla
-      const selectedService = services.find(s => s._id === initialServiceId);
-      setServiceDuration(selectedService?.duration || 0);
-
-      console.log('Edit açıldı - initialData:', initialData);
-      console.log('Edit açıldı - form state:', {
-        customerId: initialData.customer?._id || '',
-        employeeId: initialData.employee?._id || '',
-        date: initialData.date || '',
-        time: initialData.time || '',
-        serviceId: initialServiceId,
-        notes: initialData.notes || '',
-      });
-      console.log('Edit açıldı - selectedService:', selectedService);
+      // Toplam süre ve fiyatı hesapla
+      const duration = selectedServices.reduce((sum, svc) => sum + (svc.duration || 0), 0);
+      const price = selectedServices.reduce((sum, svc) => sum + (svc.price || 0), 0);
+      setTotalDuration(duration);
+      setTotalPrice(price);
+      setServiceDuration(duration);
     }
   }, [initialData, services]);
 
-  // Sadece form.serviceId değiştiğinde süreyi güncelle (kullanıcı select'ten seçtiğinde)
+  // Seçili hizmetler değiştiğinde toplam süre ve fiyatı güncelle
   useEffect(() => {
-    const selectedService = services.find(s => s._id === form.serviceId);
-    setServiceDuration(selectedService?.duration || 0);
-  }, [form.serviceId, services]);
+    const duration = form.selectedServices.reduce((sum, svc) => sum + (svc.duration || 0), 0);
+    const price = form.selectedServices.reduce((sum, svc) => sum + (svc.price || 0), 0);
+    setTotalDuration(duration);
+    setTotalPrice(price);
+    setServiceDuration(duration);
+  }, [form.selectedServices]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -69,35 +74,35 @@ export default function AppointmentEditForm({
   const handleSubmit = (e) => {
     e.preventDefault();
   
-    const requiredFields = ['customerId', 'employeeId', 'date', 'time', 'serviceId'];
+    const requiredFields = ['customerId', 'employeeId', 'date', 'time'];
     const hasEmpty = requiredFields.some((field) => !form[field]);
+    
+    if (form.selectedServices.length === 0) {
+      alert('En az bir hizmet seçmelisiniz.');
+      return;
+    }
   
     if (hasEmpty) {
       alert('Tüm alanları doldurunuz.');
       return;
     }
-  
-    // Seçilen hizmet nesnesini bul
-    const selectedService = services.find((s) => s._id === form.serviceId);
-    if (!selectedService) {
-      alert('Lütfen bir hizmet seçin.');
-      return;
-    }
+
+    const selectedServicesData = form.selectedServices.map(svc => ({
+      _id: svc.value,
+      name: svc.label.split(' (')[0],
+      duration: svc.duration,
+      price: svc.price,
+    }));
 
     const payload = {
-        employee: form.employeeId,
-        customer: form.customerId,
-        date: form.date,
-        time: form.time,
-        services: [{
-          _id: selectedService._id,
-          name: selectedService.name,
-          duration: selectedService.duration,
-          price: selectedService.price,
-        }],
-        duration: serviceDuration,
-        notes: form.notes,
-        force: false, // Varsayılan olarak force false
+      employee: form.employeeId,
+      customer: form.customerId,
+      date: form.date,
+      time: form.time,
+      services: selectedServicesData,
+      duration: totalDuration,
+      notes: form.notes,
+      force: false, // Varsayılan olarak force false
     };
   
     // Eğer seçilen saat doluysa, modal sor
@@ -138,6 +143,22 @@ export default function AppointmentEditForm({
     onSubmit(payload);
   };
   
+  const serviceOptions = useMemo(() => {
+    return services.map((s) => ({
+      value: s._id,
+      label: `${s.name} (${s.duration} dk - ${s.price} TL)`,
+      duration: s.duration,
+      price: s.price
+    }));
+  }, [services]);
+
+  const filteredServiceOptions = useMemo(() => {
+    if (!serviceSearch) return serviceOptions;
+    return serviceOptions.filter(option => 
+      option.label.toLowerCase().includes(serviceSearch.toLowerCase())
+    );
+  }, [serviceOptions, serviceSearch]);
+
   const customerOptions = customers.map((c) => ({
     value: c._id,
     label: `${c.name} - ${c.phone || ''}`,
@@ -153,7 +174,6 @@ export default function AppointmentEditForm({
     value: emp._id,
     label: `${emp.name} - ${emp.role}`
   }));
-
 
   const timeOptions = useMemo(() => {
     if (!form.employeeId || !form.date || serviceDuration === 0) return [];
@@ -289,22 +309,36 @@ export default function AppointmentEditForm({
         </div>
       </div>
 
-      {/* Hizmet */}
+      {/* Hizmetler */}
       <div>
-        <label className="block font-medium mb-1">Hizmet</label>
-        <select
-          name="serviceId"
-          value={form.serviceId}
-          onChange={handleChange}
-          className="w-full p-2 border rounded"
-        >
-          <option value="">Seçiniz</option>
-          {(services || []).map((s) => (
-            <option key={s._id} value={s._id}>
-              {s.name} ({s.duration} dk)
-            </option>
-          ))}
-        </select>
+        <div className="flex justify-between items-center mb-1">
+          <label className="block font-medium">Hizmetler</label>
+          {form.selectedServices.length > 0 && (
+            <div className="text-sm text-gray-600">
+              Toplam: {totalDuration} dk • {totalPrice.toFixed(2)} TL
+            </div>
+          )}
+        </div>
+        <Select
+          isMulti
+          options={filteredServiceOptions}
+          value={form.selectedServices}
+          onChange={(selected) => {
+            setForm(prev => ({
+              ...prev,
+              selectedServices: selected || [],
+              time: '' // Reset time when services change as duration might have changed
+            }));
+          }}
+          onInputChange={(inputValue) => setServiceSearch(inputValue)}
+          placeholder="Hizmet ara veya seç..."
+          noOptionsMessage={() => 'Hizmet bulunamadı'}
+          isClearable
+          isSearchable
+          className="basic-multi-select"
+          classNamePrefix="select"
+          closeMenuOnSelect={false}
+        />
       </div>
 
       {/* Notlar */}

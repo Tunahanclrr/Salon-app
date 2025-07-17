@@ -26,12 +26,14 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemTypes.APPOINTMENT,
     item: () => {
-      const rawService = appointment.services?.[0];
-      const matchedService = services?.find(
-        (s) => s.name === rawService?.name && s.duration === rawService?.duration
-      );
-
-      const serviceId = matchedService?._id || null;
+      // Include all services in the drag payload
+      const matchedServices = appointment.services?.map(rawService => {
+        const matchedService = services?.find(
+          s => s._id === rawService?._id || 
+              (s.name === rawService?.name && s.duration === rawService?.duration)
+        );
+        return matchedService?._id || null;
+      }).filter(Boolean);
 
       const payload = {
         id: appointment._id,
@@ -39,7 +41,7 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
         date: appointment.date,
         time: appointment.time,
         duration: appointment.duration,
-        serviceId,
+        serviceIds: matchedServices,
       };
 
       return payload;
@@ -50,7 +52,7 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
   }));
 
   const customerName = appointment.customer?.name || 'Müşteri';
-  const serviceName = appointment.services?.[0]?.name || 'Hizmet';
+  const serviceNames = appointment.services?.map(s => s.name).join(', ') || 'Hizmet';
 
   const [startHour, startMinute] = appointment.time.split(':').map((val) => parseInt(val, 10));
   const startTimeInMinutes = startHour * 60 + startMinute;
@@ -89,8 +91,10 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
       }}
     >
       <div className="font-semibold truncate">{customerName}</div>
-      <div className="text-gray-700 truncate">{serviceName}</div>
-      <div className="text-gray-600 mt-0 sm:mt-1">
+      <div className="text-gray-700 text-[8px] sm:text-[10px] leading-tight truncate">
+        {serviceNames}
+      </div>
+      <div className="text-gray-600 text-[8px] sm:text-[10px] mt-0 sm:mt-0.5">
         {appointment.time} -{' '}
         {new Date(
           new Date(0, 0, 0, startHour, startMinute).getTime() +
@@ -106,7 +110,8 @@ const TimeSlot = ({ time, date, employee, onDropAppointment, onDoubleClick }) =>
     accept: ItemTypes.APPOINTMENT,
     drop: (item) => {
       if (employee && date && time) {
-        onDropAppointment(item.id, employee._id, date, time, item.serviceId);
+        // Pass the array of service IDs to handleDropAppointment
+        onDropAppointment(item.id, employee._id, date, time, item.serviceIds || []);
       }
     },
     collect: (monitor) => ({
@@ -147,6 +152,8 @@ const Appointments = () => {
 
   const [showConfirmDropModal, setShowConfirmDropModal] = useState(false);
   const [pendingDropData, setPendingDropData] = useState(null);
+  const [showAppointmentDetail, setShowAppointmentDetail] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   const services = useSelector((state) => state.services.items);
   const employees = useSelector((state) => state.employees.items);
@@ -292,7 +299,7 @@ const Appointments = () => {
     newEmployeeId,
     newDate,
     newTime,
-    droppedServiceId
+    droppedServiceIds
   ) => {
     const appointmentToUpdate = allAppointments.find(app => app._id === appointmentId);
 
@@ -301,32 +308,45 @@ const Appointments = () => {
       return;
     }
 
-    const serviceIdToUse = droppedServiceId || appointmentToUpdate.services?.[0]?._id;
-    if (!serviceIdToUse) {
-      console.error("Hizmet ID'si bulunamadı!", { droppedServiceId, existingService: appointmentToUpdate.services?.[0]?._id });
+    // If we have droppedServiceIds (from drag), use those, otherwise use existing services
+    const serviceIdsToUse = droppedServiceIds?.length > 0 
+      ? droppedServiceIds 
+      : appointmentToUpdate.services?.map(s => s._id);
+
+    if (!serviceIdsToUse || serviceIdsToUse.length === 0) {
+      console.error("Hizmet ID'leri bulunamadı!", { 
+        droppedServiceIds, 
+        existingServices: appointmentToUpdate.services 
+      });
       toast.error('Hizmet bilgisi eksik, güncellenemedi! Lütfen randevuyu düzenleme formundan güncelleyin.');
       return;
     }
 
-    const selectedService = services?.find(s => s._id === serviceIdToUse);
-    if (!selectedService) {
+    // Find all selected services
+    const selectedServices = services?.filter(s => serviceIdsToUse.includes(s._id));
+    if (!selectedServices || selectedServices.length === 0) {
       toast.error("Hizmet bilgisi eksik, güncelleme başarısız!");
       return;
     }
 
+    // Calculate total duration
+    const totalDuration = selectedServices.reduce((sum, svc) => sum + (svc.duration || 30), 0);
+
     const updatedData = {
       employee: newEmployeeId,
-      customer: typeof appointmentToUpdate.customer === 'object' ? appointmentToUpdate.customer._id : appointmentToUpdate.customer,
+      customer: typeof appointmentToUpdate.customer === 'object' 
+        ? appointmentToUpdate.customer._id 
+        : appointmentToUpdate.customer,
       date: newDate,
       time: newTime,
       notes: appointmentToUpdate.notes || '',
-      duration: selectedService.duration || 30,
-      services: [{
-        _id: selectedService._id,
-        name: selectedService.name,
-        duration: selectedService.duration,
-        price: selectedService.price, 
-      }],
+      duration: totalDuration,
+      services: selectedServices.map(svc => ({
+        _id: svc._id,
+        name: svc.name,
+        duration: svc.duration,
+        price: svc.price,
+      })),
     };
 
     const [sh, sm] = newTime.split(':').map(Number);
@@ -434,11 +454,16 @@ const Appointments = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden relative calendar-grid-container">
-          <div className="grid border-b border-gray-200 relative z-20 bg-gray-50 sticky top-0 calendar-header-grid"
+          <div 
+            className="grid border-b border-gray-200 relative z-20 bg-gray-50 sticky top-0 left-0 calendar-header-grid"
             style={{
-              '--employee-count': employees.length
-            }}>
-            <div className="py-2 px-1 sm:py-3 sm:px-2 border-r border-gray-200 font-semibold text-xs sm:text-sm text-gray-700 text-center time-column-sticky">Saat</div>
+              '--employee-count': employees.length,
+              'grid-template-columns': `60px repeat(${employees.length}, minmax(120px, 1fr))`
+            }}
+          >
+            <div className="py-2 px-1 sm:py-3 sm:px-2 border-r border-gray-200 font-semibold text-xs sm:text-sm text-gray-700 text-center time-column-sticky flex items-center justify-center">
+              <span>Saat</span>
+            </div>
             {employees.map((emp, index) => {
               const colors = ['bg-green-100', 'bg-orange-100', 'bg-blue-100', 'bg-pink-100', 'bg-purple-100', 'bg-yellow-100'];
               const borderColors = ['border-green-300', 'border-orange-300', 'border-blue-300', 'border-pink-300', 'border-purple-300', 'border-yellow-300'];
@@ -455,20 +480,41 @@ const Appointments = () => {
             })}
           </div>
 
-          <div className="relative grid calendar-body-grid"
+          <div 
+            className="relative grid calendar-body-grid"
             style={{
-              '--employee-count': employees.length
-            }}>
-            <div className="time-column-sticky">
+              '--employee-count': employees.length,
+              'grid-template-columns': `60px repeat(${employees.length}, minmax(120px, 1fr))`
+            }}
+          >
+            <div className="time-column-sticky bg-white" style={{ width: '60px' }}>
               {timeSlots.map((slot) => (
-                <div key={slot} className="h-12 text-[10px] sm:text-xs text-gray-500 border-t border-gray-100 flex items-start justify-end pr-1 sm:pr-2 pt-1 bg-white">
-                  {(slot.endsWith(':00') || slot.endsWith(':30')) ? slot : ''}
+                <div 
+                  key={slot} 
+                  className="h-12 text-[10px] sm:text-xs text-gray-500 border-t border-gray-100 flex items-center justify-center pr-1 sm:pr-2 bg-white"
+                  style={{ 
+                    minHeight: '3rem',
+                    lineHeight: '1.2',
+                    padding: '0.25rem 0.25rem 0.25rem 0'
+                  }}
+                >
+                  {(slot.endsWith(':00') || slot.endsWith(':30')) ? (
+                    <span className="text-right w-full">{slot}</span>
+                  ) : null}
                 </div>
               ))}
             </div>
 
             {employees.map(emp => (
-              <div key={emp._id} className="relative border-r border-gray-100">
+              <div 
+                key={emp._id} 
+                className="relative border-r border-gray-100 bg-white"
+                style={{ 
+                  minWidth: '120px',
+                  width: '100%',
+                  position: 'relative'
+                }}
+              >
                 {timeSlots.map((time) => (
                   <TimeSlot
                     key={`${emp._id}-${selectedDate}-${time}`}
@@ -487,8 +533,8 @@ const Appointments = () => {
                       services={services}
                       appointment={app} 
                       onEdit={appointment => {
-                        setEditingAppointment(appointment);
-                        setEditModalOpen(true);
+                        setSelectedAppointment(appointment);
+                        setShowAppointmentDetail(true);
                       }}
                     />
                   ))}
@@ -535,6 +581,72 @@ const Appointments = () => {
 
         <Modal open={customerModalOpen} onClose={() => setCustomerModalOpen(false)} title="Müşteri Ekle">
           <CustomerForm onSubmit={handleAddCustomer} onCancel={() => setCustomerModalOpen(false)} />
+        </Modal>
+
+        {/* Randevu Detay Modalı */}
+        <Modal 
+          open={showAppointmentDetail} 
+          onClose={() => setShowAppointmentDetail(false)} 
+          title="Randevu Detayları"
+          size="md"
+        >
+          {selectedAppointment && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h3 className="font-semibold text-gray-700">Müşteri:</h3>
+                  <p>{selectedAppointment.customer?.name || 'Bilinmiyor'}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-700">Personel:</h3>
+                  <p>{selectedAppointment.employee?.name || 'Bilinmiyor'}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-700">Tarih:</h3>
+                  <p>{new Date(selectedAppointment.date).toLocaleDateString('tr-TR')}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-700">Saat:</h3>
+                  <p>{selectedAppointment.time}</p>
+                </div>
+                <div className="col-span-2">
+                  <h3 className="font-semibold text-gray-700">Hizmetler:</h3>
+                  <ul className="list-disc pl-5 mt-1">
+                    {selectedAppointment.services?.map((service, index) => (
+                      <li key={index}>
+                        {service.name} - {service.duration} dk - {service.price} TL
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {selectedAppointment.notes && (
+                  <div className="col-span-2">
+                    <h3 className="font-semibold text-gray-700">Notlar:</h3>
+                    <p className="mt-1 bg-gray-50 p-2 rounded">{selectedAppointment.notes}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex justify-end space-x-3 pt-4 border-t mt-4">
+                <button
+                  onClick={() => setShowAppointmentDetail(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
+                >
+                  Kapat
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingAppointment(selectedAppointment);
+                    setEditModalOpen(true);
+                    setShowAppointmentDetail(false);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Randevuyu Düzenle
+                </button>
+              </div>
+            </div>
+          )}
         </Modal>
 
         {showConfirmDropModal && pendingDropData && (

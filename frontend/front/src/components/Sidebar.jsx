@@ -13,6 +13,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   const menuItems = [
     { path: '/', icon: FiHome, label: 'Ana Sayfa' },
     { path: '/randevular', icon: FiCalendar, label: 'Randevular' },
+    { path: '/hizmetler', icon: FiScissors, label: 'Hizmetler' },
     { path: '/personeller', icon: FiUserCheck, label: 'Personeller' },
     { path: '/musteriler', icon: FiUsers, label: 'Müşteriler' },
   ];
