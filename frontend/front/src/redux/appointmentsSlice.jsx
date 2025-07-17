@@ -41,6 +41,23 @@ export const updateAppointment = createAsyncThunk(
   }
 );
 
+// Müşteri gelmedi durumunu güncelleme thunk'ı
+export const updateCustomerNotArrived = createAsyncThunk(
+  'appointments/updateCustomerNotArrived',
+  async ({ id, customerNotArrived }, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.put(
+        `http://localhost:4000/api/appointments/${id}/customer-not-arrived`,
+        { customerNotArrived }
+      );
+      return data;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Müşteri gelmedi durumu güncellenirken hata oluştu';
+      return rejectWithValue(msg);
+    }
+  }
+);
+
 const appointmentsSlice = createSlice({
   name: 'appointments',
   initialState: {
@@ -83,9 +100,24 @@ const appointmentsSlice = createSlice({
       .addCase(updateAppointment.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
+      })
+      .addCase(updateCustomerNotArrived.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(updateCustomerNotArrived.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        // Güncellenen randevuyu listede güncelle
+        const index = state.items.findIndex(app => app._id === action.payload.data._id);
+        if (index !== -1) {
+          state.items[index] = action.payload.data;
+        }
+      })
+      .addCase(updateCustomerNotArrived.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
       });
       
   },
 });
 
-export default appointmentsSlice.reducer; 
+export default appointmentsSlice.reducer;

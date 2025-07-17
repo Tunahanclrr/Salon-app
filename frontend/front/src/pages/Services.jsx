@@ -104,9 +104,14 @@ export default function Services() {
                   <p className="text-base sm:text-lg font-medium text-gray-900 truncate flex-1">
                     {service.name}
                   </p>
-                  <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">
-                    {service.duration} dakika
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">
+                      {service.duration} dakika
+                    </span>
+                    <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 whitespace-nowrap">
+                      {service.price} ₺
+                    </span>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEdit(service)}

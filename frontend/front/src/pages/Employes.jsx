@@ -1,4 +1,3 @@
-import React from 'react'
 import Employe from '../components/Employe'
 
 export default function Employes() {

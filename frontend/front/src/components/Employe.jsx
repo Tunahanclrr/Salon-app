@@ -4,6 +4,7 @@ import { fetchEmployees, deleteEmployee, addEmployee } from '../redux/employeesS
 import ConfirmModal from './ConfirmModal';
 import Modal from './Modal';
 import EmployeeForm from './EmployeeForm';
+import { Link } from 'react-router-dom'; 
 
 export default function Employe() {
   const dispatch = useDispatch();
@@ -69,12 +70,13 @@ export default function Employe() {
               <td className="py-2 text-sm  px-4">{emp.email}</td>
               <td className="py-2 text-sm  px-4">{emp.phone}</td>
               <td className="py-2 text-sm  px-4 flex gap-2">
-                <button
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm"
-                  // ... randevuları gör butonu ...
-                >
-                  Randevuları Gör
-                </button>
+
+<Link to={`/personeller/${emp._id}/randevular`}>
+  <button className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm">
+    Randevuları Gör
+  </button>
+</Link>
+
                 <button
                   className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
                   onClick={() => handleDeleteClick(emp._id)}
