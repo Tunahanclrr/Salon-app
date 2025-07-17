@@ -64,7 +64,22 @@ export default function AppointmentEditForm({
     setTotalDuration(duration);
     setTotalPrice(price);
     setServiceDuration(duration);
-  }, [form.selectedServices]);
+    
+    // Hizmet değiştiğinde zaman seçimini koruyalım, ancak uygun olup olmadığını kontrol edelim
+    if (form.time && form.employeeId && form.date) {
+      // Mevcut seçili zamanın uygun olup olmadığını kontrol et
+      const [sh, sm] = form.time.split(':').map(Number);
+      const slotStart = new Date(0, 0, 0, sh, sm);
+      const slotEnd = new Date(slotStart.getTime() + duration * 60000);
+      
+      // Gün sonu kontrolü
+      const endOfDay = new Date(0, 0, 0, 20, 0); // Kapanış saati 20:00
+      if (slotEnd > endOfDay) {
+        // Eğer yeni süre ile randevu kapanış saatini aşıyorsa, zamanı sıfırla
+        setForm(prev => ({ ...prev, time: '' }));
+      }
+    }
+  }, [form.selectedServices, form.employeeId, form.date, form.time]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -326,8 +341,8 @@ export default function AppointmentEditForm({
           onChange={(selected) => {
             setForm(prev => ({
               ...prev,
-              selectedServices: selected || [],
-              time: '' // Reset time when services change as duration might have changed
+              selectedServices: selected || []
+              // Zaman sıfırlamayı kaldırdık, böylece hizmet değiştiğinde zaman korunacak
             }));
           }}
           onInputChange={(inputValue) => setServiceSearch(inputValue)}

@@ -17,3 +17,17 @@ exports.getServices = async (_req,res)=>{
     res.json(list);
   }catch(err){ res.status(500).json({message:'Sunucu hatası'}); }
 };
+
+// DELETE /api/services/:id – hizmet silme
+exports.deleteService = async (req,res)=>{
+  try{
+    const { id } = req.params;
+    if(!id) return res.status(400).json({message:'ID gerekli'});
+    const svc = await Service.findByIdAndDelete(id);
+    if(!svc) return res.status(404).json({message:'Hizmet bulunamadı'});
+    res.status(200).json({ message:'Hizmet silindi', data:svc });
+  }catch(err){ 
+    console.error('Delete service error:', err);
+    res.status(500).json({message:'Sunucu hatası'}); 
+  }
+};

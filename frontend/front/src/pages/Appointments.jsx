@@ -26,14 +26,43 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemTypes.APPOINTMENT,
     item: () => {
-      // Include all services in the drag payload
-      const matchedServices = appointment.services?.map(rawService => {
-        const matchedService = services?.find(
-          s => s._id === rawService?._id || 
-              (s.name === rawService?.name && s.duration === rawService?.duration)
-        );
-        return matchedService?._id || null;
-      }).filter(Boolean);
+      const serviceIds = [];
+      console.log('Dragging appointment with services:', appointment.services);
+      
+      if (appointment.services && appointment.services.length > 0) {
+        appointment.services.forEach(service => {
+          if (service._id) {
+            // Doğrudan _id değeri varsa kullan
+            serviceIds.push(service._id);
+          } else if (service.name && services) {
+            // _id yoksa, önce hizmet adı ve süresine göre eşleştirme yap
+            let matchedService = services.find(s => 
+              s.name === service.name && 
+              (!service.duration || s.duration === service.duration)
+            );
+            
+            // Eğer bulunamazsa, sadece hizmet adına göre eşleştirme yap (büyük/küçük harf duyarsız)
+            if (!matchedService) {
+              matchedService = services.find(s => 
+                s.name.toLowerCase() === service.name.toLowerCase()
+              );
+            }
+            
+            // Hala bulunamazsa, hizmet adının bir kısmını içeren herhangi bir hizmeti bul
+            if (!matchedService) {
+              matchedService = services.find(s => 
+                s.name.toLowerCase().includes(service.name.toLowerCase()) || 
+                service.name.toLowerCase().includes(s.name.toLowerCase())
+              );
+            }
+            if (matchedService && matchedService._id) {
+              serviceIds.push(matchedService._id);
+            }
+          }
+        });
+      }
+      
+      console.log('Service IDs for drag:', serviceIds);
 
       const payload = {
         id: appointment._id,
@@ -41,7 +70,7 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
         date: appointment.date,
         time: appointment.time,
         duration: appointment.duration,
-        serviceIds: matchedServices,
+        serviceIds: serviceIds, // Doğrudan _id değerlerini kullan
       };
 
       return payload;
@@ -308,18 +337,61 @@ const Appointments = () => {
       return;
     }
 
-    // If we have droppedServiceIds (from drag), use those, otherwise use existing services
-    const serviceIdsToUse = droppedServiceIds?.length > 0 
-      ? droppedServiceIds 
-      : appointmentToUpdate.services?.map(s => s._id);
+    console.log('Drop appointment with ID:', appointmentId);
+    console.log('Dropped service IDs:', droppedServiceIds);
+    console.log('Original appointment services:', appointmentToUpdate.services);
+
+    // Daima orijinal randevudaki hizmetleri kullan
+    // Sürükle-bırak işleminde sadece tarih, saat ve çalışan değişmeli, hizmetler değişmemeli
+    const serviceIdsToUse = [];
+    
+    // Hizmet nesnelerinin yapısını kontrol et ve _id değerlerini doğru şekilde al
+    if (appointmentToUpdate.services && appointmentToUpdate.services.length > 0) {
+      appointmentToUpdate.services.forEach(service => {
+        if (service._id) {
+          // Doğrudan _id değeri varsa kullan
+          serviceIdsToUse.push(service._id);
+        } else if (service.name && services) {
+          // _id yoksa, önce hizmet adı ve süresine göre eşleştirme yap
+          let matchedService = services.find(s => 
+            s.name === service.name && 
+            (!service.duration || s.duration === service.duration)
+          );
+          
+          // Eğer bulunamazsa, sadece hizmet adına göre eşleştirme yap (büyük/küçük harf duyarsız)
+          if (!matchedService) {
+            matchedService = services.find(s => 
+              s.name.toLowerCase() === service.name.toLowerCase()
+            );
+          }
+          
+          // Hala bulunamazsa, hizmet adının bir kısmını içeren herhangi bir hizmeti bul
+          if (!matchedService) {
+            matchedService = services.find(s => 
+              s.name.toLowerCase().includes(service.name.toLowerCase()) || 
+              service.name.toLowerCase().includes(s.name.toLowerCase())
+            );
+          }
+          if (matchedService && matchedService._id) {
+            serviceIdsToUse.push(matchedService._id);
+          }
+        }
+      });
+    }
 
     if (!serviceIdsToUse || serviceIdsToUse.length === 0) {
       console.error("Hizmet ID'leri bulunamadı!", { 
-        droppedServiceIds, 
         existingServices: appointmentToUpdate.services 
       });
-      toast.error('Hizmet bilgisi eksik, güncellenemedi! Lütfen randevuyu düzenleme formundan güncelleyin.');
-      return;
+      
+      // Hizmet ID'leri bulunamazsa, ilk hizmeti varsayılan olarak kullan
+      if (services && services.length > 0) {
+        console.log('Varsayılan hizmet kullanılıyor:', services[0]);
+        serviceIdsToUse.push(services[0]._id);
+      } else {
+        toast.error('Hizmet bilgisi eksik, güncellenemedi! Lütfen randevuyu düzenleme formundan güncelleyin.');
+        return;
+      }
     }
 
     // Find all selected services
