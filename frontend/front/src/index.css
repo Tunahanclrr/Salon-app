@@ -32,21 +32,113 @@
   box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
 }
 
-/* Mobil cihazlar için özel stiller */
+/* Tablet ve büyük ekranlar için ayarlar */
+.appointment-tablet {
+  font-size: 14px !important;
+  padding: 4px 8px !important;
+  line-height: 1.3 !important;
+}
+
+.appointment-tablet .customer-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.appointment-tablet .service-name {
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.appointment-tablet .time-info {
+  font-size: 10px;
+}
+
+.appointment-tablet .not-arrived-text {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Mobil cihazlar için responsive ayarlar */
 @media (max-width: 767px) {
-  .calendar-grid-container {
-    overflow-x: scroll;
-    -webkit-overflow-scrolling: touch;
-  }
-  
   .calendar-header-grid,
   .calendar-body-grid {
+    grid-template-columns: 45px repeat(auto-fit, minmax(65px, 1fr));
+    overflow-x: scroll;
     min-width: max-content;
-    width: auto;
   }
-  
+
   .calendar-header-grid > div,
   .calendar-body-grid > div {
-    min-width: 100px;
+    min-width: 65px;
+    max-width: 65px;
+  }
+
+  .employee-column {
+    margin-left: 2px;
+  }
+
+  .time-column-sticky {
+    width: 45px;
+    min-width: 45px;
+    font-size: 9px;
+    z-index: 15;
+  }
+
+  .appointment-mobile {
+    position: absolute;
+    right: 2px;
+    font-size: 8px !important;
+    padding: 1px 2px !important;
+    line-height: 1.1 !important;
+  }
+
+  .appointment-mobile .customer-name {
+    font-size: 8px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .appointment-mobile .not-arrived-text {
+    font-size: 7px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .appointment-mobile .service-name {
+    font-size: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .appointment-mobile .time-info {
+    font-size: 7px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .appointment-mobile .close-icon {
+    width: 8px;
+    height: 8px;
+    top: -2px;
+    right: -2px;
+  }
+}
+
+/* Tablet cihazlar için özel stiller */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .calendar-header-grid > div,
+  .calendar-body-grid > div {
+    min-width: 90px;
+  }
+  
+  .appointment-tablet {
+    font-size: 9px !important;
+    padding: 3px 4px !important;
   }
 }

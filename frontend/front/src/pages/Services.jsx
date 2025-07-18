@@ -1,7 +1,7 @@
 // src/pages/Services.jsx
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchServices, addService, deleteService } from '../redux/servicesSlice'; // addService ve deleteService import edildi
+import { fetchServices, addService, deleteService, editService } from '../redux/servicesSlice'; // addService, deleteService ve editService import edildi
 import Modal from '../components/Modal'; // Modal bileşeni import edildi
 import ServiceForm from '../components/ServiceForm'; // ServiceForm bileşeni import edildi
 import { FiPlus } from 'react-icons/fi'; // Ekle butonu için ikon
@@ -54,13 +54,19 @@ export default function Services() {
   };
 
   const handleEditService = async (id, data) => {
-    const resultAction = await dispatch(editService({ id, data }));
-    if (editService.fulfilled.match(resultAction)) {
-      toast.success('Hizmet başarıyla düzenlendi!');
-      setIsEditModalOpen(false);
-      dispatch(fetchServices());
-    } else {
-      toast.error(resultAction.payload || 'Hizmet düzenlenirken bir hata oluştu.');
+    try {
+      const resultAction = await dispatch(editService({ id, data }));
+      if (editService.fulfilled.match(resultAction)) {
+        toast.success('Hizmet başarıyla düzenlendi!');
+        setIsEditModalOpen(false);
+        setEditingService(null);
+        await dispatch(fetchServices());
+      } else {
+        throw new Error(resultAction.payload || 'Hizmet düzenlenirken bir hata oluştu.');
+      }
+    } catch (error) {
+      console.error('Error editing service:', error);
+      toast.error(error.message);
     }
   };
 
@@ -153,12 +159,18 @@ export default function Services() {
 
       <Modal
         open={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingService(null);
+        }}
         title="Hizmeti Düzenle"
       >
         <ServiceForm
           onSubmit={(data) => handleEditService(editingService._id, data)}
-          onCancel={() => setIsEditModalOpen(false)}
+          onCancel={() => {
+            setIsEditModalOpen(false);
+            setEditingService(null);
+          }}
           initialData={editingService}
         />
       </Modal>
@@ -190,7 +202,11 @@ export default function Services() {
               İptal
             </button>
             <button
-              onClick={() => handleDelete(deletingService._id)}
+              onClick={() => {
+                handleDelete(deletingService._id);
+                setConfirmDelete(false);
+                setDeletingService(null);
+              }}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             >
               Sil

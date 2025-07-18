@@ -4,7 +4,7 @@ import { FiCalendar, FiPlus } from 'react-icons/fi';
 import { fetchEmployees } from '../redux/employeesSlice';
 import { fetchCustomers, addCustomer } from '../redux/customersSlice';
 import { fetchServices } from '../redux/servicesSlice';
-import { addAppointment, updateAppointment } from '../redux/appointmentsSlice';
+import { addAppointment, updateAppointment, updateCustomerNotArrived } from '../redux/appointmentsSlice';
 import Modal from '../components/Modal';
 import AppointmentForm from '../components/AppointmentForm';
 import AppointmentEditForm from '../components/AppointmenEditForm';
@@ -17,7 +17,7 @@ const ItemTypes = {
   APPOINTMENT: 'appointment',
 };
 
-const PX_PER_15_MINUTES = 48;
+const PX_PER_15_MINUTES = 60; // Randevu kutularının yüksekliği için arttırıldı
 
 const CALENDAR_START_HOUR = 9;
 const CALENDAR_START_HOUR_IN_MINUTES = CALENDAR_START_HOUR * 60;
@@ -90,7 +90,7 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
   const top = Math.round(
     (startTimeInMinutes - CALENDAR_START_HOUR_IN_MINUTES) * (PX_PER_15_MINUTES / 15)
   );
-  const height = durationInMinutes * (PX_PER_15_MINUTES / 15);
+  const height = Math.round(durationInMinutes * (PX_PER_15_MINUTES / 15));
 
   const employeeIndex = appointment.employee?.index ?? 0;
   const colorPalette = [
@@ -101,7 +101,14 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
     'bg-purple-200 border-purple-400 text-purple-800',
     'bg-yellow-200 border-yellow-400 text-yellow-800',
   ];
-  const appointmentColorClass = colorPalette[employeeIndex % colorPalette.length];
+  
+  // Müşteri gelmedi durumunda farklı stil uygula
+  let appointmentColorClass;
+  if (appointment.customerNotArrived) {
+    appointmentColorClass = 'bg-red-200 border-red-400 text-red-800';
+  } else {
+    appointmentColorClass = colorPalette[employeeIndex % colorPalette.length];
+  }
 
   const appointmentZIndex = appointment.zIndex || 20;
 
@@ -109,21 +116,87 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
     <div
       ref={drag}
       onClick={() => onEdit(appointment)}
-      className={`absolute ${appointmentColorClass} rounded-md px-1 py-0.5 text-[8px] sm:px-2 sm:py-1 sm:text-[10px] font-medium shadow-sm hover:shadow-md cursor-pointer transition-all leading-tight`}
+      className={`absolute ${appointmentColorClass} rounded-md font-medium shadow-sm hover:shadow-md cursor-pointer transition-all leading-tight ${
+        appointment.customerNotArrived ? 'opacity-75' : ''
+      } appointment-mobile md:appointment-tablet`}
       style={{
         top: `${top}px`,
         height: `${height}px`,
-        width: `${appointment.dynamicWidth}%`, // Dynamic width for side-by-side
-        left: `${appointment.dynamicLeft}%`,   // Dynamic left for side-by-side
+        width: window.innerWidth <= 767 
+          ? `calc(${appointment.dynamicWidth}% - 1px)` 
+          : `calc(${appointment.dynamicWidth}% - 4px)`,
+        left: window.innerWidth <= 767 
+          ? `${appointment.dynamicLeft}%` 
+          : `calc(${appointment.dynamicLeft}% + 16px)`,
         opacity: isDragging ? 0.6 : 1,
-        zIndex: appointmentZIndex,
+        zIndex: appointment.zIndex || (20 + (appointment.columnIndex || 0)),
+        fontSize: window.innerWidth <= 767 ? '6px' : '12px',
+        
+        padding: window.innerWidth <= 767 ? '1px 2px' : '4px 10px',
+        lineHeight: window.innerWidth <= 767 ? '1.1' : '1.3',
+        overflow: 'hidden',
+        wordWrap: 'break-word',
+        boxSizing: 'border-box',
+        
+        border: window.innerWidth <= 767 ? '0.5px solid' : '1px solid',
       }}
     >
-      <div className="font-semibold truncate">{customerName}</div>
-      <div className="text-gray-700 text-[8px] sm:text-[10px] leading-tight truncate">
+      {/* Müşteri gelmedi durumu için çarpı işareti */}
+      {appointment.customerNotArrived && (
+        <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full flex items-center justify-center font-bold close-icon"
+             style={{
+               width: window.innerWidth <= 767 ? '8px' : '12px',
+               height: window.innerWidth <= 767 ? '8px' : '12px',
+               fontSize: window.innerWidth <= 767 ? '4px' : '6px',
+             }}>
+          ✕
+        </div>
+      )}
+      
+      <div className="font-semibold truncate customer-name"
+           style={{
+             fontSize: window.innerWidth <= 767 ? '8px' : '14px',
+             marginBottom: '0px',
+             lineHeight: window.innerWidth <= 767 ? '1.1' : '1.2',
+             whiteSpace: 'nowrap',
+             overflow: 'hidden',
+             textOverflow: 'ellipsis',
+           }}>
+        {customerName}
+      </div>
+      
+      {appointment.customerNotArrived && (
+        <div className="text-red-700 not-arrived-text font-bold leading-tight"
+             style={{
+               fontSize: window.innerWidth <= 767 ? '7px' : '12px',
+               lineHeight: '1.1',
+               whiteSpace: 'nowrap',
+               overflow: 'hidden',
+               textOverflow: 'ellipsis',
+             }}>
+          MÜŞTERİ GELMEDİ
+        </div>
+      )}
+      
+      {/* Hizmet adını hem mobilde hem masaüstünde göster */}
+      <div className="text-gray-700 service-name leading-tight truncate"
+           style={{
+             fontSize: window.innerWidth <= 767 ? '6px' : '12px',
+             lineHeight: '1.1',
+             marginBottom: '0px',
+           }}>
         {serviceNames}
       </div>
-      <div className="text-gray-600 text-[8px] sm:text-[10px] mt-0 sm:mt-0.5">
+      
+      <div className="text-gray-600 time-info"
+           style={{
+             fontSize: window.innerWidth <= 767 ? '7px' : '10px',
+             lineHeight: '1.1',
+             marginTop: '1px',
+             whiteSpace: 'nowrap',
+             overflow: 'hidden',
+             textOverflow: 'ellipsis',
+           }}>
         {appointment.time} -{' '}
         {new Date(
           new Date(0, 0, 0, startHour, startMinute).getTime() +
@@ -164,8 +237,8 @@ const TimeSlot = ({ time, date, employee, onDropAppointment, onDoubleClick }) =>
     <div
       ref={drop}
       onDoubleClick={() => onDoubleClick(employee, date, time)}
-      className={`h-12 border ${borderColor} ${backgroundColor} relative transition-colors duration-100`}
-      style={{ boxSizing: 'border-box' }}
+      className={`border ${borderColor} ${backgroundColor} relative transition-colors duration-100`}
+      style={{ boxSizing: 'border-box', height: '60px' }}
     />
   );
 };
@@ -264,14 +337,29 @@ const Appointments = () => {
       // Randevuları işledikten sonra, her randevu için dynamicWidth ve dynamicLeft değerlerini hesapla
       columns.forEach((column, columnIndex) => {
         const maxColumns = columns.length; // Toplam kolon sayısı
-        const widthPerColumn = 100 / maxColumns;
+        
+        // Mobil cihazlar için farklı genişlik hesaplaması
+        const isMobile = window.innerWidth <= 767;
+        let widthPerColumn, leftOffset;
+        
+        if (isMobile) {
+          // Mobilde daha dar kolonlar ve daha az boşluk
+          widthPerColumn = Math.max(85 / maxColumns, 25); // Minimum %25 genişlik
+          leftOffset = (100 / maxColumns) * columnIndex + 2; // 2px offset
+        } else {
+          // Desktop için mevcut hesaplama
+          widthPerColumn = (100 / maxColumns) * 0.8; // %80 genişlik kullan
+          leftOffset = (100 / maxColumns) * columnIndex + ((100 / maxColumns) * 0.1); // Ortalamak için biraz sağa kaydır
+        }
 
         column.forEach(appInColumn => {
           processedAppointments.push({
             ...appInColumn,
             dynamicWidth: widthPerColumn,
-            dynamicLeft: widthPerColumn * appInColumn.columnIndex,
-            zIndex: 20 + appInColumn.columnIndex,
+            dynamicLeft: leftOffset,
+            zIndex: 20 + columnIndex,
+            columnIndex: columnIndex,
+            totalColumns: maxColumns,
           });
         });
       });
@@ -465,6 +553,32 @@ const Appointments = () => {
     }
   };
 
+  const handleCustomerNotArrived = async (appointmentId, status) => {
+    try {
+      const result = await dispatch(updateCustomerNotArrived({ 
+        appointmentId, 
+        customerNotArrived: status 
+      }));
+      
+      if (updateCustomerNotArrived.fulfilled.match(result)) {
+        toast.success(status ? 'Müşteri gelmedi olarak işaretlendi' : 'Müşteri geldi olarak işaretlendi');
+        dispatch(fetchEmployees());
+        
+        // Eğer modal açıksa, seçili randevuyu güncelle
+        if (selectedAppointment && selectedAppointment._id === appointmentId) {
+          setSelectedAppointment(prev => ({
+            ...prev,
+            customerNotArrived: status
+          }));
+        }
+      } else {
+        toast.error(result.payload?.message || 'Durum güncellenemedi');
+      }
+    } catch (error) {
+      toast.error('Bir hata oluştu');
+    }
+  };
+
   const timeSlots = useMemo(() => {
     const slots = [];
     for (let h = CALENDAR_START_HOUR; h < 23; h++) {
@@ -563,9 +677,9 @@ const Appointments = () => {
               {timeSlots.map((slot) => (
                 <div 
                   key={slot} 
-                  className="h-12 text-[10px] sm:text-xs text-gray-500 border-t border-gray-100 flex items-center justify-center pr-1 sm:pr-2 bg-white"
+                  className="text-[10px] sm:text-xs text-gray-500 border-t border-gray-100 flex items-center justify-center pr-1 sm:pr-2 bg-white"
                   style={{ 
-                    minHeight: '3rem',
+                    height: '60px',
                     lineHeight: '1.2',
                     padding: '0.25rem 0.25rem 0.25rem 0'
                   }}
@@ -664,6 +778,27 @@ const Appointments = () => {
         >
           {selectedAppointment && (
             <div className="space-y-4">
+              {/* Durum Göstergesi */}
+              {selectedAppointment.customerNotArrived && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">
+                        Müşteri Gelmedi
+                      </h3>
+                      <div className="mt-1 text-sm text-red-700">
+                        Bu randevuya müşteri gelmemiştir.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <h3 className="font-semibold text-gray-700">Müşteri:</h3>
@@ -686,7 +821,7 @@ const Appointments = () => {
                   <ul className="list-disc pl-5 mt-1">
                     {selectedAppointment.services?.map((service, index) => (
                       <li key={index}>
-                        {service.name} - {service.duration} dk - {service.price} TL
+                        {service.name} - {service.duration} dk - {service.price} ₺
                       </li>
                     ))}
                   </ul>
@@ -699,23 +834,36 @@ const Appointments = () => {
                 )}
               </div>
               
-              <div className="flex justify-end space-x-3 pt-4 border-t mt-4">
+              <div className="flex justify-between items-center pt-4 border-t mt-4">
                 <button
-                  onClick={() => setShowAppointmentDetail(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
+                  onClick={() => handleCustomerNotArrived(selectedAppointment._id, !selectedAppointment.customerNotArrived)}
+                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                    selectedAppointment.customerNotArrived
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : 'bg-red-600 hover:bg-red-700 text-white'
+                  }`}
                 >
-                  Kapat
+                  {selectedAppointment.customerNotArrived ? 'Müşteri Geldi' : 'Müşteri Gelmedi'}
                 </button>
-                <button
-                  onClick={() => {
-                    setEditingAppointment(selectedAppointment);
-                    setEditModalOpen(true);
-                    setShowAppointmentDetail(false);
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                >
-                  Randevuyu Düzenle
-                </button>
+                
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowAppointmentDetail(false)}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
+                  >
+                    Kapat
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingAppointment(selectedAppointment);
+                      setEditModalOpen(true);
+                      setShowAppointmentDetail(false);
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  >
+                    Randevuyu Düzenle
+                  </button>
+                </div>
               </div>
             </div>
           )}

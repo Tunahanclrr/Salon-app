@@ -5,7 +5,8 @@ import {
   FiSettings, 
   FiHome,
   FiScissors,
-  FiUserCheck
+  FiUserCheck,
+  FiPackage
 } from 'react-icons/fi'
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
@@ -16,6 +17,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     { path: '/hizmetler', icon: FiScissors, label: 'Hizmetler' },
     { path: '/personeller', icon: FiUserCheck, label: 'Personeller' },
     { path: '/musteriler', icon: FiUsers, label: 'Müşteriler' },
+    { path: '/paket-satislari', icon: FiPackage, label: 'Paket Satışları' },
   ];
   
   

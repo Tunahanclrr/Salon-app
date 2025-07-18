@@ -5,6 +5,7 @@ import Appointments from './pages/Appointments';
 import Customers from './pages/Customers';
 import Employes from './pages/Employes';
 import Services from './pages/Services';
+import PackageSales from './pages/PackageSales';
 import EmployeeAppointments from './pages/EmployeeAppointments';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
           <Route path="personeller" element={<Employes />} />
           <Route path="musteriler" element={<Customers />} />
           <Route path="hizmetler" element={<Services />} />
+          <Route path="paket-satislari" element={<PackageSales />} />
         </Route>
       </Routes>
     </BrowserRouter>

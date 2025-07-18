@@ -44,10 +44,10 @@ export const updateAppointment = createAsyncThunk(
 // Müşteri gelmedi durumunu güncelleme thunk'ı
 export const updateCustomerNotArrived = createAsyncThunk(
   'appointments/updateCustomerNotArrived',
-  async ({ id, customerNotArrived }, { rejectWithValue }) => {
+  async ({ appointmentId, customerNotArrived }, { rejectWithValue }) => {
     try {
       const { data } = await axios.put(
-        `http://localhost:4000/api/appointments/${id}/customer-not-arrived`,
+        `http://localhost:4000/api/appointments/${appointmentId}/customer-not-arrived`,
         { customerNotArrived }
       );
       return data;

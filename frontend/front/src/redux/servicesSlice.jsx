@@ -88,7 +88,8 @@ const servicesSlice = createSlice({
       })
       .addCase(addService.fulfilled, (state, action) => {
         state.loading = false;
-        state.items = [...state.items, action.payload];
+        const newService = action.payload.data || action.payload;
+        state.items = [...state.items, newService];
       })
       .addCase(addService.rejected, (state, action) => {
         state.loading = false;
@@ -100,9 +101,10 @@ const servicesSlice = createSlice({
       })
       .addCase(editService.fulfilled, (state, action) => {
         state.loading = false;
-        const index = state.items.findIndex(item => item._id === action.payload._id);
+        const updatedService = action.payload.data || action.payload;
+        const index = state.items.findIndex(item => item._id === updatedService._id);
         if (index !== -1) {
-          state.items[index] = action.payload;
+          state.items[index] = updatedService;
         }
       })
       .addCase(editService.rejected, (state, action) => {

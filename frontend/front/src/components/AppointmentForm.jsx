@@ -49,10 +49,7 @@ export default function AppointmentForm({
   const [forceSend, setForceSend] = useState(false);
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
 
-  // Modal yeni müşteri için
-  const [newCustomerModalOpen, setNewCustomerModalOpen] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "" });
-  const [newCustomerError, setNewCustomerError] = useState("");
+  // Modal yeni müşteri için - artık kullanılmıyor, parent component'te yönetiliyor
 
   // Arama için debounce kullanılan müşteri arama state'i
   const [customerSearch, setCustomerSearch] = useState("");
@@ -297,21 +294,8 @@ export default function AppointmentForm({
   };
 
   // --- Yeni müşteri ekleme işlemleri ---
-  const handleNewCustomerChange = (e) => {
-    const { name, value } = e.target;
-    setNewCustomer((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleNewCustomerSubmit = () => {
-    if (!newCustomer.name.trim() || !newCustomer.phone.trim()) {
-      setNewCustomerError("Lütfen tüm alanları doldurun.");
-      return;
-    }
-    setNewCustomerError("");
-    // onAddCustomer fonksiyonunun yeni müşteri objesi ile çağrıldığını varsayıyoruz.
-    onAddCustomer(newCustomer);
-    setNewCustomer({ name: "", phone: "" });
-    setNewCustomerModalOpen(false);
+  const handleAddNewCustomer = () => {
+    onAddCustomer(); // Parent component'teki modal'ı aç
   };
 
   return (
@@ -343,7 +327,7 @@ export default function AppointmentForm({
           <button
             type="button"
             className="mt-2 bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-sm"
-            onClick={() => setNewCustomerModalOpen(true)}
+            onClick={handleAddNewCustomer}
           >
             + Yeni Müşteri
           </button>
@@ -536,57 +520,6 @@ export default function AppointmentForm({
           >
             Zorla Gönder
           </button>
-        </div>
-      </Modal>
-
-      {/* Yeni Müşteri Modalı */}
-      <Modal
-        open={newCustomerModalOpen}
-        onClose={() => setNewCustomerModalOpen(false)}
-      >
-        <h3 className="text-lg font-semibold mb-4">Yeni Müşteri Ekle</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Ad Soyad
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={newCustomer.name}
-              onChange={handleNewCustomerChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Telefon
-            </label>
-            <input
-              type="text"
-              name="phone"
-              value={newCustomer.phone}
-              onChange={handleNewCustomerChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-          {newCustomerError && (
-            <p className="text-red-600 text-sm">{newCustomerError}</p>
-          )}
-          <div className="flex justify-end space-x-3 pt-2">
-            <button
-              onClick={() => setNewCustomerModalOpen(false)}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              İptal
-            </button>
-            <button
-              onClick={handleNewCustomerSubmit}
-              className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
-            >
-              Kaydet
-            </button>
-          </div>
         </div>
       </Modal>
     </>

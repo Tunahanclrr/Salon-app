@@ -161,7 +161,7 @@ export default function AppointmentEditForm({
   const serviceOptions = useMemo(() => {
     return services.map((s) => ({
       value: s._id,
-      label: `${s.name} (${s.duration} dk - ${s.price} TL)`,
+      label: `${s.name} (${s.duration} dk - ${s.price} ₺)`,
       duration: s.duration,
       price: s.price
     }));

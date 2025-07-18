@@ -23,9 +23,13 @@ export const deleteCustomer = createAsyncThunk(
 // Müşteri ekleme thunk'ı
 export const addCustomer = createAsyncThunk(
   'customers/addCustomer',
-  async (customer) => {
-    const response = await axios.post('http://localhost:4000/api/customers', customer);
-    return response.data;
+  async (customer, { rejectWithValue }) => {
+    try {
+      const response = await axios.post('http://localhost:4000/api/customers', customer);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Müşteri eklenirken hata oluştu');
+    }
   }
 );
 
@@ -55,6 +59,9 @@ const customersSlice = createSlice({
       })
       .addCase(addCustomer.fulfilled, (state, action) => {
         state.items.push(action.payload);
+      })
+      .addCase(addCustomer.rejected, (state, action) => {
+        state.error = action.payload;
       });
   },
 });
