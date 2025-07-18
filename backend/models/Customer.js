@@ -22,7 +22,15 @@ const customerSchema = new mongoose.Schema({
   },
   notes: {
     type: String
-  }
+  },
+  appointments: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Appointment'
+  }],
+  packageSales: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PackageSale'
+  }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Customer', customerSchema);

@@ -31,6 +31,11 @@ const employeeSchema = new mongoose.Schema({
     appointments: [{
       type: mongoose.Schema.Types.ObjectId,
         ref: 'Appointment'
+   }],
+   // Paket satışları (PackageSale modelinden referans alır)
+   packageSales: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PackageSale'
    }]
 
 }, { timestamps: true })

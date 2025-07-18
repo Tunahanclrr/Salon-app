@@ -12,7 +12,12 @@ const serviceSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Süre zorunludur.'],
     min: [1, 'Süre en az 1 dakika olmalıdır.'],
-  }
+  },
+  price: {
+    type: Number,
+    required: [true, 'Fiyat zorunludur.'],
+    min: [0, 'Fiyat 0 veya daha büyük olmalıdır.'],
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Service', serviceSchema);

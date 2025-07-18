@@ -9,6 +9,11 @@ const serviceSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 5 // minimum 5 dakika
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0 // minimum 0 TL
   }
 }, { _id: false }); // _id alanı otomatik oluşturulmasın
 
@@ -46,6 +51,10 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'confirmed', 'completed', 'cancelled'],
     default: 'pending'
+  },
+  customerNotArrived: {
+    type: Boolean,
+    default: false
   }
 }, { 
   timestamps: true,

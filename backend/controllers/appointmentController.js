@@ -35,7 +35,8 @@ exports.createAppointment = async (req, res) => {
     const finalServices = foundServices.map(svc => ({
       _id: svc._id,
       name: svc.name,
-      duration: svc.duration
+      duration: svc.duration,
+      price: svc.price
     }));
 
     // Zaman hesaplama
@@ -150,7 +151,8 @@ exports.updateAppointment = async (req, res) => {
     const finalServices = foundServices.map(svc => ({
       _id: svc._id,
       name: svc.name,
-      duration: svc.duration
+      duration: svc.duration,
+      price: svc.price
     }));
 
     const start = DateTime.fromFormat(`${date} ${time}`, 'yyyy-MM-dd HH:mm');
@@ -248,6 +250,41 @@ exports.deleteAppointment = async (req, res) => {
     console.error('deleteAppointment error:', error);
     res.status(500).json({
       message: 'Randevu silinirken bir hata oluştu.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Müşteri gelmedi durumunu güncelle
+exports.updateCustomerNotArrived = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { customerNotArrived } = req.body;
+    
+    if (customerNotArrived === undefined) {
+      return res.status(400).json({ message: 'customerNotArrived alanı gereklidir.' });
+    }
+    
+    const appointment = await Appointment.findById(id);
+    if (!appointment) {
+      return res.status(404).json({ message: 'Randevu bulunamadı.' });
+    }
+    
+    appointment.customerNotArrived = customerNotArrived;
+    await appointment.save();
+    
+    const populated = await Appointment.findById(appointment._id)
+      .populate('customer', 'name email phone')
+      .populate('employee', 'name role');
+    
+    res.status(200).json({
+      message: 'Müşteri gelmedi durumu güncellendi.',
+      data: populated
+    });
+  } catch (error) {
+    console.error('updateCustomerNotArrived error:', error);
+    res.status(500).json({
+      message: 'Müşteri gelmedi durumu güncellenirken bir hata oluştu.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
