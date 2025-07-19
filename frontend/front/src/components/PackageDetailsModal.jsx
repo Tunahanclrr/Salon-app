@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiX, FiCalendar, FiDollarSign, FiList, FiUser, FiFileText } from 'react-icons/fi';
+import { FiX, FiCalendar, FiDollarSign, FiList, FiUser, FiFileText, FiCreditCard } from 'react-icons/fi';
 import { useSelector } from 'react-redux';
 
 export default function PackageDetailsModal({ packageSale, onClose, formatCurrency, getCustomerName, getEmployeeName }) {
@@ -94,23 +94,30 @@ export default function PackageDetailsModal({ packageSale, onClose, formatCurren
 
               {/* Ödeme Bilgileri */}
               <div className="p-4">
-                <h3 className="font-medium text-gray-900 mb-3">Ödeme Bilgileri</h3>
+                <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-1">
+                  <FiDollarSign className="text-gray-500" size={16} />
+                  Ödeme Bilgileri
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Toplam Tutar</p>
-                    <p className="font-medium text-gray-900">{formatCurrency(packageSale.totalAmount)}</p>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">Toplam Tutar</p>
+                    <p className="font-medium text-gray-900 text-lg">{formatCurrency(packageSale.totalAmount)}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Ödenen Tutar</p>
-                    <p className="font-medium text-green-600">{formatCurrency(packageSale.paidAmount)}</p>
+                  <div className="bg-green-50 p-3 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">Ödenen Tutar</p>
+                    <p className="font-medium text-green-600 text-lg">{formatCurrency(packageSale.paidAmount)}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Kalan Tutar</p>
-                    <p className="font-medium text-red-600">{formatCurrency(packageSale.remainingAmount)}</p>
+                  <div className="bg-red-50 p-3 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">Kalan Tutar</p>
+                    <p className="font-medium text-red-600 text-lg">{formatCurrency(packageSale.remainingAmount)}</p>
                   </div>
+                </div>
+                
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-sm text-gray-500">Ödeme Yöntemi</p>
-                    <p className="font-medium">
+                    <p className="text-sm text-gray-500 mb-1">Ödeme Yöntemi</p>
+                    <p className="font-medium flex items-center gap-1">
+                      <FiCreditCard className="text-gray-400" size={14} />
                       {packageSale.paymentMethod === 'cash' ? 'Nakit' : 
                        packageSale.paymentMethod === 'card' ? 'Kredi Kartı' : 
                        packageSale.paymentMethod === 'transfer' ? 'Havale/EFT' : 
@@ -118,49 +125,37 @@ export default function PackageDetailsModal({ packageSale, onClose, formatCurren
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Taksitli Ödeme</p>
-                    <p className="font-medium">{packageSale.isInstallment ? 'Evet' : 'Hayır'}</p>
+                    <p className="text-sm text-gray-500 mb-1">Ödeme Planı</p>
+                    <p className="font-medium">
+                      {packageSale.isInstallment ? 
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Taksitli Ödeme</span> : 
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Tek Seferde Ödeme</span>}
+                    </p>
                   </div>
                   {packageSale.isInstallment && (
                     <div>
-                      <p className="text-sm text-gray-500">Taksit Sayısı</p>
-                      <p className="font-medium">{packageSale.installmentCount}</p>
+                      <p className="text-sm text-gray-500 mb-1">Taksit Sayısı</p>
+                      <p className="font-medium">{packageSale.installmentCount} Taksit</p>
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Paket İçeriği */}
-              <div className="p-4">
-                <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-1">
-                  <FiList className="text-gray-500" size={16} />
-                  Paket İçeriği
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hizmet</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Adet</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Birim Fiyat</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Toplam</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {packageSale.services.map((service, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{service.service.name}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{service.quantity}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{formatCurrency(service.unitPrice)}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatCurrency(service.quantity * service.unitPrice)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                
+                {/* Ödeme Durumu Göstergesi */}
+                <div className="mt-4">
+                  <p className="text-sm text-gray-500 mb-2">Ödeme Durumu</p>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className="bg-green-600 h-2.5 rounded-full" 
+                      style={{ width: `${Math.min(100, (packageSale.paidAmount / packageSale.totalAmount) * 100)}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 text-right">
+                    {Math.round((packageSale.paidAmount / packageSale.totalAmount) * 100)}% Tamamlandı
+                  </p>
                 </div>
               </div>
+
+              {/* Paket İçeriği kısmı kaldırıldı */}
 
               {/* Taksit Bilgileri */}
               {packageSale.isInstallment && packageSale.installments && packageSale.installments.length > 0 && (
@@ -169,7 +164,28 @@ export default function PackageDetailsModal({ packageSale, onClose, formatCurren
                     <FiDollarSign className="text-gray-500" size={16} />
                     Taksit Bilgileri
                   </h3>
-                  <div className="overflow-x-auto">
+                  
+                  {/* Taksit Özeti */}
+                  <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-500 mb-1">Toplam Taksit</p>
+                      <p className="font-medium text-blue-700 text-lg">{packageSale.installments.length}</p>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-500 mb-1">Ödenen Taksit</p>
+                      <p className="font-medium text-green-700 text-lg">
+                        {packageSale.installments.filter(i => i.isPaid).length}
+                      </p>
+                    </div>
+                    <div className="bg-yellow-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-500 mb-1">Kalan Taksit</p>
+                      <p className="font-medium text-yellow-700 text-lg">
+                        {packageSale.installments.filter(i => !i.isPaid).length}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
@@ -183,21 +199,32 @@ export default function PackageDetailsModal({ packageSale, onClose, formatCurren
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {packageSale.installments.map((installment, index) => (
-                          <tr key={index}>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{formatCurrency(installment.amount)}</td>
+                          <tr key={index} className={installment.isPaid ? 'bg-green-50' : ''}>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(installment.amount)}</td>
                             <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                              {formatDate(installment.dueDate)}
+                              <div className="flex items-center gap-1">
+                                <FiCalendar className="text-gray-400" size={14} />
+                                {formatDate(installment.dueDate)}
+                              </div>
                             </td>
                             <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                              {installment.paidDate ? formatDate(installment.paidDate) : '-'}
+                              {installment.paidDate ? (
+                                <div className="flex items-center gap-1">
+                                  <FiCalendar className="text-green-500" size={14} />
+                                  {formatDate(installment.paidDate)}
+                                </div>
+                              ) : '-'}
                             </td>
                             <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
                               {installment.isPaid ? (
-                                installment.paymentMethod === 'cash' ? 'Nakit' : 
-                                installment.paymentMethod === 'card' ? 'Kredi Kartı' : 
-                                installment.paymentMethod === 'transfer' ? 'Havale/EFT' : 
-                                installment.paymentMethod
+                                <div className="flex items-center gap-1">
+                                  <FiCreditCard className="text-gray-400" size={14} />
+                                  {installment.paymentMethod === 'cash' ? 'Nakit' : 
+                                   installment.paymentMethod === 'card' ? 'Kredi Kartı' : 
+                                   installment.paymentMethod === 'transfer' ? 'Havale/EFT' : 
+                                   installment.paymentMethod}
+                                </div>
                               ) : '-'}
                             </td>
                             <td className="px-4 py-2 whitespace-nowrap text-sm">

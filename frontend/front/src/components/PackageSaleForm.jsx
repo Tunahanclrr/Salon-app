@@ -333,7 +333,7 @@ export default function PackageSaleForm({ onSubmit, onCancel, loading }) {
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="flex justify-between items-center mb-4">
             <label className="text-sm font-medium text-gray-700">
-              Ek Hizmetler
+              Ek Hizmetler (Opsiyonel)
             </label>
             <button
               type="button"

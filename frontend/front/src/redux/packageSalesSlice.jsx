@@ -45,7 +45,9 @@ export const addInstallmentPayment = createAsyncThunk(
       // Taksit indeksini parametre olarak al
       const response = await axios.post(`http://localhost:4000/api/package-sales/${id}/installments/${installmentIndex}/pay`, {
         paymentMethod: payment.paymentMethod,
-        paidDate: payment.date
+        paidDate: payment.date,
+        amount: payment.amount, // Ödeme tutarını da gönder
+        description: payment.description // Açıklamayı da gönder
       });
       return response.data;
     } catch (error) {

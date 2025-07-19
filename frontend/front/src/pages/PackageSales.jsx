@@ -64,7 +64,12 @@ export default function PackageSales() {
     }))
       .then((resultAction) => {
         if (addInstallmentPayment.fulfilled.match(resultAction)) {
-          toast.success('Taksit ödemesi başarıyla eklendi!');
+          // Taksitli mi yoksa doğrudan ödeme mi olduğunu kontrol et
+          if (selectedPackage.isInstallment && paymentData.installmentIndex !== undefined) {
+            toast.success('Taksit ödemesi başarıyla eklendi!');
+          } else {
+            toast.success('Ödeme doğrudan yapılmıştır!');
+          }
           setPaymentModalOpen(false);
           setSelectedPackage(null);
           // Paket satışlarını ve paketleri yeniden yükle
@@ -72,8 +77,8 @@ export default function PackageSales() {
           dispatch(fetchPackages());
         } else if (addInstallmentPayment.rejected.match(resultAction)) {
           const errorMessage = resultAction.payload || resultAction.error.message;
-          console.error('Taksit ödemesi eklenirken hata:', errorMessage);
-          toast.error(errorMessage || 'Taksit ödemesi eklenirken hata oluştu');
+          console.error('Ödeme eklenirken hata:', errorMessage);
+          toast.error(errorMessage || 'Ödeme eklenirken hata oluştu');
         }
       })
       .catch((error) => {
@@ -343,7 +348,10 @@ export default function PackageSales() {
       {/* Installment Payment Modal */}
       <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="Taksit Ödemesi">
         <InstallmentPaymentForm
-          packageSale={selectedPackage}
+          packageSale={selectedPackage ? {
+            ...selectedPackage,
+            packageName: getPackageName(selectedPackage.packageType)
+          } : null}
           onSubmit={handleInstallmentPayment}
           onCancel={() => setPaymentModalOpen(false)}
           loading={loading}

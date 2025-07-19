@@ -39,7 +39,9 @@ export default function InstallmentPaymentForm({ packageSale, onSubmit, onCancel
       ...formData,
       amount: numericAmount,
       date: formData.paymentDate || new Date().toISOString().split('T')[0],
-      installmentIndex: parseInt(formData.installmentIndex, 10)
+      // Taksit yoksa veya taksitli değilse 0 gönder
+      installmentIndex: packageSale.installments && packageSale.installments.length > 0 ? 
+        parseInt(formData.installmentIndex, 10) : 0
     });
   };
 
@@ -87,7 +89,7 @@ export default function InstallmentPaymentForm({ packageSale, onSubmit, onCancel
         <h3 className="font-medium text-gray-900 mb-2">Paket Bilgileri</h3>
         <div className="space-y-1 text-sm text-gray-600">
           <div>Müşteri: <span className="font-medium text-gray-900">{getCustomerName()}</span></div>
-          <div>Paket Türü: <span className="font-medium text-gray-900">{packageSale.packageType}</span></div>
+          <div>Paket Türü: <span className="font-medium text-gray-900">{packageSale.packageName || 'Bilinmeyen Paket'}</span></div>
           <div>Toplam Tutar: <span className="font-medium text-gray-900">{formatCurrency(packageSale.totalAmount)}</span></div>
           <div>Ödenen: <span className="font-medium text-green-600">{formatCurrency(packageSale.paidAmount)}</span></div>
           <div>Kalan: <span className="font-medium text-red-600">{formatCurrency(packageSale.remainingAmount)}</span></div>
@@ -95,8 +97,8 @@ export default function InstallmentPaymentForm({ packageSale, onSubmit, onCancel
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Installment Selection */}
-        {packageSale.installments && packageSale.installments.length > 0 && (
+        {/* Installment Selection - Sadece taksitli ödeme ise göster */}
+        {packageSale.isInstallment && packageSale.installments && packageSale.installments.length > 0 && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <FiList className="inline mr-1" />
@@ -120,6 +122,13 @@ export default function InstallmentPaymentForm({ packageSale, onSubmit, onCancel
                 </option>
               ))}
             </select>
+          </div>
+        )}
+        
+        {/* Taksitli ödeme değilse bilgi mesajı gösterme */}
+        {!packageSale.isInstallment && (
+          <div className="bg-blue-50 p-3 rounded-lg mb-4">
+            <p className="text-sm text-blue-700">Bu paket için taksitli ödeme seçilmemiş. Doğrudan ödeme yapabilirsiniz.</p>
           </div>
         )}
 
