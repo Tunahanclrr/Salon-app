@@ -22,10 +22,15 @@ exports.createPackageSale = async (req, res) => {
     } = req.body;
 
     // Zorunlu alanları kontrol et
-    if (!customer || !seller || !services || !services.length) {
+    if (!customer || !seller) {
       return res.status(400).json({
-        message: 'Müşteri, satıcı ve en az bir hizmet seçilmelidir.'
+        message: 'Müşteri ve satıcı seçilmelidir.'
       });
+    }
+    
+    // Services null veya undefined ise boş array olarak ayarla
+    if (!services) {
+      services = [];
     }
 
     // Hizmetleri doğrula ve fiyatları hesapla - sadece boş olmayan hizmetleri kontrol et
@@ -244,10 +249,44 @@ exports.payInstallment = async (req, res) => {
       return res.status(404).json({ message: 'Paket satışı bulunamadı.' });
     }
 
-    if (!packageSale.installments[installmentIndex]) {
-      return res.status(404).json({ message: 'Taksit bulunamadı.' });
+    // Taksitli ödeme değilse veya taksit yoksa normal ödeme yap
+    if (!packageSale.isInstallment || !packageSale.installments || packageSale.installments.length === 0 || !packageSale.installments[installmentIndex]) {
+      // Taksit yoksa normal ödeme olarak kaydet
+      const payment = {
+        amount: req.body.amount || 0,
+        paymentMethod: paymentMethod || 'cash',
+        paymentDate: paidDate ? new Date(paidDate) : new Date(),
+        description: req.body.description || ''
+      };
+
+      // Ödemeleri güncelle
+      if (!packageSale.payments) {
+        packageSale.payments = [];
+      }
+      packageSale.payments.push(payment);
+
+      // Ödenen tutarı güncelle
+      packageSale.paidAmount = (packageSale.paidAmount || 0) + (payment.amount || 0);
+      
+      // Kalan tutar 0 veya daha az ise durumu tamamlandı olarak işaretle
+      if (packageSale.paidAmount >= packageSale.totalAmount) {
+        packageSale.status = 'completed';
+      }
+
+      await packageSale.save();
+
+      const populated = await PackageSale.findById(packageSale._id)
+        .populate('customer', 'name email phone')
+        .populate('seller', 'name role')
+        .populate('services.service', 'name price duration');
+
+      return res.status(200).json({
+        message: 'Ödeme başarıyla kaydedildi.',
+        data: populated
+      });
     }
 
+    // Taksitli ödeme ise taksiti kontrol et
     const installment = packageSale.installments[installmentIndex];
     
     if (installment.isPaid) {
