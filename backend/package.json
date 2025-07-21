@@ -1,24 +1,27 @@
 {
-  "name": "backend",
+  "name": "krasa-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Krasa App Backend - Kuaför Salonu Yönetim Sistemi",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["express", "mongodb", "kuafor", "appointment", "management"],
+  "author": "Krasa Team",
+  "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
-    "dotenv": "^17.0.0",
-    "express": "^5.1.0",
-    "luxon": "^3.6.1",
-    "mongoose": "^8.16.1"
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "luxon": "^3.4.4",
+    "mongoose": "^8.0.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   }
 }
