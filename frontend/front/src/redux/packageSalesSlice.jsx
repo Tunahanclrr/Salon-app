@@ -1,24 +1,31 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-import API_BASE_URL from '../config/api';
+import { API_BASE_URL } from '../config/api';
 
-// Paket satışlarını getirme thunk'ı
-export const fetchPackageSales = createAsyncThunk('packageSales/fetchPackageSales', async () => {
-  const response = await axios.get(`${API_BASE_URL}/api/package-sales`);
-  return response.data;
-});
-
-// Paket satışı ekleme thunk'ı
-export const addPackageSale = createAsyncThunk('packageSales/addPackageSale', async (packageSale, { rejectWithValue }) => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/api/package-sales`, packageSale);
+// Paket satışlarını çekme
+export const fetchPackageSales = createAsyncThunk(
+  'packageSales/fetchPackageSales',
+  async () => {
+    const response = await axios.get(`${API_BASE_URL}/api/package-sales`);
     return response.data;
-  } catch (error) {
-    return rejectWithValue(error.response?.data?.message || 'Paket satışı eklenirken hata oluştu');
   }
-});
+);
 
-// Paket satışı güncelleme thunk'ı
+// Yeni paket satışı ekleme
+export const addPackageSale = createAsyncThunk(
+  'packageSales/addPackageSale',
+  async (packageSale, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/package-sales`, packageSale);
+      return response.data;
+    } catch (error) {
+      console.error('API Error:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Paket satışı eklenirken hata oluştu');
+    }
+  }
+);
+
+// Paket satışını güncelleme
 export const updatePackageSale = createAsyncThunk(
   'packageSales/updatePackageSale',
   async ({ id, updates }, { rejectWithValue }) => {
@@ -31,60 +38,62 @@ export const updatePackageSale = createAsyncThunk(
   }
 );
 
-// Taksit ödeme thunk'ı
-export const payInstallment = createAsyncThunk(
-  'packageSales/payInstallment',
-  async ({ id, installmentIndex, paymentData }, { rejectWithValue }) => {
+// Taksit ödeme
+export const addInstallmentPayment = createAsyncThunk(
+  'packageSales/addInstallmentPayment',
+  async ({ id, payment, installmentIndex = 0 }, { rejectWithValue }) => {
     try {
+      // Taksit indeksini parametre olarak al
       const response = await axios.post(`${API_BASE_URL}/api/package-sales/${id}/installments/${installmentIndex}/pay`, {
-        ...paymentData
+        paymentMethod: payment.paymentMethod,
+        paidDate: payment.date,
+        amount: payment.amount, // Ödeme tutarını da gönder
+        description: payment.description // Açıklamayı da gönder
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Taksit ödemesi yapılırken hata oluştu');
+      console.error('Taksit ödeme API hatası:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Taksit ödemesi eklenirken hata oluştu');
     }
   }
 );
 
-// Ek ödeme ekleme thunk'ı
-export const addPayment = createAsyncThunk(
-  'packageSales/addPayment',
+// Tahsilat yapma
+export const makePayment = createAsyncThunk(
+  'packageSales/makePayment',
   async ({ id, paymentData }, { rejectWithValue }) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/package-sales/${id}/payments`, paymentData);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Ödeme eklenirken hata oluştu');
+      console.error('Tahsilat API hatası:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Tahsilat yapılırken hata oluştu');
     }
   }
 );
 
-// Hizmet kullanma thunk'ı
-export const useService = createAsyncThunk(
-  'packageSales/useService',
-  async ({ id, serviceId, usedCount }, { rejectWithValue }) => {
+// Hizmet kullanımı
+export const usePackageService = createAsyncThunk(
+  'packageSales/usePackageService',
+  async ({ id, serviceId, quantity }, { rejectWithValue }) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/package-sales/${id}/use-service`, {
         serviceId,
-        usedCount
+        quantity
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Hizmet kullanılırken hata oluştu');
+      return rejectWithValue(error.response?.data?.message || 'Hizmet kullanımı kaydedilirken hata oluştu');
     }
   }
 );
 
-// Müşteriye göre paket satışlarını getirme thunk'ı
-export const fetchPackageSalesByCustomer = createAsyncThunk(
-  'packageSales/fetchPackageSalesByCustomer',
-  async (customerId, { rejectWithValue }) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/package-sales/customer/${customerId}`);
-      return response.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Müşteri paket satışları getirilirken hata oluştu');
-    }
+// Müşteriye ait paket satışlarını çekme
+export const fetchCustomerPackageSales = createAsyncThunk(
+  'packageSales/fetchCustomerPackageSales',
+  async (customerId) => {
+    const response = await axios.get(`${API_BASE_URL}/api/package-sales/customer/${customerId}`);
+    return response.data;
   }
 );
 

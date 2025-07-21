@@ -1,24 +1,30 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-import API_BASE_URL from '../config/api';
+import { API_BASE_URL } from '../config/api';
 
-// Paketleri getirme thunk'ı
-export const fetchPackages = createAsyncThunk('packages/fetchPackages', async () => {
-  const response = await axios.get(`${API_BASE_URL}/api/packages`);
-  return response.data;
-});
-
-// Paket ekleme thunk'ı
-export const addPackage = createAsyncThunk('packages/addPackage', async (packageData, { rejectWithValue }) => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/api/packages`, packageData);
+// Paketleri çekme
+export const fetchPackages = createAsyncThunk(
+  'packages/fetchPackages',
+  async () => {
+    const response = await axios.get(`${API_BASE_URL}/api/packages`);
     return response.data;
-  } catch (error) {
-    return rejectWithValue(error.response?.data?.message || 'Paket eklenirken hata oluştu');
   }
-});
+);
 
-// Paket güncelleme thunk'ı
+// Yeni paket ekleme
+export const addPackage = createAsyncThunk(
+  'packages/addPackage',
+  async (packageData, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/packages`, packageData);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Paket eklenirken hata oluştu');
+    }
+  }
+);
+
+// Paket güncelleme
 export const updatePackage = createAsyncThunk(
   'packages/updatePackage',
   async ({ id, updates }, { rejectWithValue }) => {
@@ -31,13 +37,13 @@ export const updatePackage = createAsyncThunk(
   }
 );
 
-// Paket silme thunk'ı
+// Paket silme
 export const deletePackage = createAsyncThunk(
   'packages/deletePackage',
   async (id, { rejectWithValue }) => {
     try {
       const response = await axios.delete(`${API_BASE_URL}/api/packages/${id}`);
-      return id;
+      return { id, ...response.data };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Paket silinirken hata oluştu');
     }

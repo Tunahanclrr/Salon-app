@@ -1,46 +1,60 @@
 // src/redux/servicesSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-import API_BASE_URL from '../config/api';
+import { API_BASE_URL } from '../config/api';
 
-// Hizmetleri getirme thunk'ı
-export const fetchServices = createAsyncThunk('services/fetchServices', async () => {
+// Tüm hizmetleri çekme (GET)
+export const fetchServices = createAsyncThunk('services/fetch', async () => {
+  console.log('Fetching services from API...');
   const { data } = await axios.get(`${API_BASE_URL}/api/services`);
+  console.log('Services fetched:', data);
   return data;
 });
 
-// Hizmet ekleme thunk'ı
-export const addService = createAsyncThunk('services/addService', async (service, { rejectWithValue }) => {
-  try {
-    const { data } = await axios.post(`${API_BASE_URL}/api/services`, service);
-    return data;
-  } catch (error) {
-    return rejectWithValue(error.response?.data?.message || 'Hizmet eklenirken hata oluştu');
-  }
-});
-
-// Hizmet güncelleme thunk'ı
-export const updateService = createAsyncThunk(
-  'services/updateService',
-  async ({ id, data }, { rejectWithValue }) => {
+// Yeni hizmet ekleme (POST)
+export const addService = createAsyncThunk(
+  'services/addService',
+  async (service, { rejectWithValue }) => {
+    console.log('Adding service:', service);
     try {
-      const { data: response } = await axios.put(`${API_BASE_URL}/api/services/${id}`, data);
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Hizmet güncellenirken hata oluştu');
+      const { data } = await axios.post(`${API_BASE_URL}/api/services`, service);
+      console.log('Service added successfully:', data);
+      return data;
+    } catch (err) {
+      console.error('Error adding service:', err);
+      const msg = err.response?.data?.message || 'Hizmet eklenirken bir sunucu hatası oluştu.';
+      return rejectWithValue(msg);
     }
   }
 );
 
-// Hizmet silme thunk'ı
+// Hizmet düzenleme (PUT)
+export const editService = createAsyncThunk(
+  'services/editService',
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const { data: response } = await axios.put(`${API_BASE_URL}/api/services/${id}`, data);
+      return response;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Hizmet düzenlenirken bir sunucu hatası oluştu.';
+      return rejectWithValue(msg);
+    }
+  }
+);
+
+// Hizmet silme (DELETE)
 export const deleteService = createAsyncThunk(
   'services/deleteService',
   async (id, { rejectWithValue }) => {
     try {
+      console.log('Deleting service with ID:', id);
       const response = await axios.delete(`${API_BASE_URL}/api/services/${id}`);
+      console.log('Delete response:', response.data);
       return id;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Hizmet silinirken hata oluştu');
+    } catch (err) {
+      console.error('Delete error:', err);
+      const msg = err.response?.data?.message || 'Hizmet silinirken bir sunucu hatası oluştu.';
+      return rejectWithValue(msg);
     }
   }
 );

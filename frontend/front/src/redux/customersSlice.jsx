@@ -1,7 +1,7 @@
 // src/features/customers/customersSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-import API_BASE_URL from '../config/api';
+import { API_BASE_URL } from '../config/api';
 
 // Müşterileri getirme thunk'ı
 export const fetchCustomers = createAsyncThunk(

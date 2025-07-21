@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-import API_BASE_URL from '../config/api';
+import { API_BASE_URL } from '../config/api';
 
 // Randevu ekleme thunk'ı
 export const addAppointment = createAsyncThunk(
@@ -16,17 +16,12 @@ export const addAppointment = createAsyncThunk(
   }
 );
 
-// Randevuları getirme thunk'ı
+// Randevuları çekme thunk'ı
 export const fetchAppointments = createAsyncThunk(
   'appointments/fetchAppointments',
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/appointments`);
-      return response.data;
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Sunucu hatası';
-      return rejectWithValue(msg);
-    }
+  async () => {
+    const response = await axios.get(`${API_BASE_URL}/api/appointments`);
+    return response.data;
   }
 );
 
@@ -35,13 +30,13 @@ export const updateAppointment = createAsyncThunk(
   'appointments/updateAppointment',
   async ({ id, appointmentData }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(
+      const { data } = await axios.put(
         `${API_BASE_URL}/api/appointments/${id}`,
         appointmentData
       );
-      return response.data;
+      return data;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Sunucu hatası';
+      const msg = err.response?.data?.message || 'Güncelleme sırasında hata oluştu';
       return rejectWithValue(msg);
     }
   }
@@ -50,15 +45,15 @@ export const updateAppointment = createAsyncThunk(
 // Müşteri gelmedi durumunu güncelleme thunk'ı
 export const updateCustomerNotArrived = createAsyncThunk(
   'appointments/updateCustomerNotArrived',
-  async ({ appointmentId, notArrived }, { rejectWithValue }) => {
+  async ({ appointmentId, customerNotArrived }, { rejectWithValue }) => {
     try {
-      const response = await axios.patch(
+      const { data } = await axios.put(
         `${API_BASE_URL}/api/appointments/${appointmentId}/customer-not-arrived`,
-        { customerNotArrived: notArrived }
+        { customerNotArrived }
       );
-      return response.data;
+      return data;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Sunucu hatası';
+      const msg = err.response?.data?.message || 'Müşteri gelmedi durumu güncellenirken hata oluştu';
       return rejectWithValue(msg);
     }
   }
