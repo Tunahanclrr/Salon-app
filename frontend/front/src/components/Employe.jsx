@@ -42,7 +42,7 @@ export default function Employe() {
   if (status === 'loading') return <div>Yükleniyor...</div>;
 
   return (
-    <div className="overflow-x-auto w-full">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-blue-900">Çalışanlar</h1>
         <button
@@ -52,24 +52,28 @@ export default function Employe() {
           Çalışan Ekle
         </button>
       </div>
-      <table className="min-w-full bg-white rounded-lg shadow">
-        <thead>
-          <tr className="bg-blue-100 text-blue-900">
-            <th className="py-2 px-4 text-left">Ad Soyad</th>
-            <th className="py-2 px-4 text-left">Rol</th>
-            <th className="py-2 px-4 text-left">E-posta</th>
-            <th className="py-2 px-4 text-left">Telefon</th>
-            <th className="py-2 px-4 text-left">İşlem</th>
-          </tr>
-        </thead>
-        <tbody>
-          {employees.map(emp => (
-            <tr key={emp._id} className="border-b overflow-auto hover:bg-blue-50 transition">
-              <td className="py-2 text-sm  px-4">{emp.name}</td>
-              <td className="py-2 text-sm  px-4">{emp.role}</td>
-              <td className="py-2 text-sm  px-4">{emp.email}</td>
-              <td className="py-2 text-sm  px-4">{emp.phone}</td>
-              <td className="py-2 text-sm  px-4 flex gap-2">
+      
+      {/* Responsive table container with horizontal scroll */}
+      <div className="overflow-x-auto bg-white rounded-lg shadow">
+        <table className="min-w-full">
+          <thead>
+            <tr className="bg-blue-100 text-blue-900">
+              <th className="py-3 px-4 text-left whitespace-nowrap">Ad Soyad</th>
+              <th className="py-3 px-4 text-left whitespace-nowrap">Rol</th>
+              <th className="py-3 px-4 text-left whitespace-nowrap">E-posta</th>
+              <th className="py-3 px-4 text-left whitespace-nowrap">Telefon</th>
+              <th className="py-3 px-4 text-left whitespace-nowrap">İşlem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {employees.map(emp => (
+              <tr key={emp._id} className="border-b hover:bg-blue-50 transition">
+                <td className="py-3 px-4 text-sm whitespace-nowrap">{emp.name}</td>
+                <td className="py-3 px-4 text-sm whitespace-nowrap">{emp.role}</td>
+                <td className="py-3 px-4 text-sm whitespace-nowrap">{emp.email}</td>
+                <td className="py-3 px-4 text-sm whitespace-nowrap">{emp.phone}</td>
+                <td className="py-3 px-4 text-sm whitespace-nowrap">
+                  <div className="flex gap-2">
 
 <Link to={`/personeller/${emp._id}/randevular`}>
   <button className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm">
@@ -77,17 +81,19 @@ export default function Employe() {
   </button>
 </Link>
 
-                <button
-                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
-                  onClick={() => handleDeleteClick(emp._id)}
-                >
-                  Sil
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                    <button
+                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+                      onClick={() => handleDeleteClick(emp._id)}
+                    >
+                      Sil
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {/* Silme için modal */}
       <ConfirmModal
         open={deleteModalOpen}
