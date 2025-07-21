@@ -1,4 +1,4 @@
-# Krasa App - Kuaför Salonu Yönetim Sistemi
+# Krasa App 
 
 ## 🚀 Projeyi Çalıştırma
 
