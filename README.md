@@ -21,12 +21,7 @@ cd backend
 npm install
 ```
 
-Backend için `.env` dosyası oluşturun:
-```env
-NODE_ENV=development
-PORT=4000
-MONGO_URI=mongodb://localhost:27017/krasa-app
-```
+
 
 #### 3. Frontend Kurulumu
 ```bash
