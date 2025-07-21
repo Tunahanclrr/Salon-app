@@ -60,14 +60,5 @@ Frontend http://localhost:5173 adresinde çalışacaktır.
 - **Backend:** Node.js, Express.js, MongoDB, Mongoose
 - **Diğer:** Axios, React Router
 
-### API Endpoints
-- `GET /api/customers` - Müşterileri listele
-- `POST /api/customers` - Yeni müşteri ekle
-- `GET /api/appointments` - Randevuları listele
-- `POST /api/appointments` - Yeni randevu oluştur
-- `GET /api/services` - Hizmetleri listele
-- `GET /api/packages` - Paketleri listele
-- `GET /api/employees` - Çalışanları listele
-
 ### Geliştirme
 Geliştirme modunda çalıştırmak için her iki servisi de ayrı terminallerde başlatın ve değişiklikler otomatik olarak yansıyacaktır.
