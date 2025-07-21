@@ -117,15 +117,7 @@ export default function PackageSales() {
     return packageItem ? packageItem.name : 'Bilinmeyen Paket';
   };
 
-  const renderCustomerName = (packageSale) => {
-    const customer = customers.find(c => c._id === packageSale.customer?._id || packageSale.customer);
-    return customer?.name || packageSale.customer?.name || 'Bilinmeyen Müşteri';
-  };
 
-  const renderEmployeeName = (packageSale) => {
-    const employee = employees.find(e => e._id === packageSale.seller?._id || packageSale.seller);
-    return employee?.name || packageSale.seller?.name || 'Bilinmeyen Çalışan';
-  };
 
   const getStatusColor = (status) => {
     switch (status) {

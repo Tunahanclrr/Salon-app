@@ -134,7 +134,7 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
         
         padding: window.innerWidth <= 767 ? '1px 2px' : '4px 10px',
         lineHeight: window.innerWidth <= 767 ? '1.1' : '1.3',
-        overflow: 'hidden',
+        overflow: 'visible',
         wordWrap: 'break-word',
         boxSizing: 'border-box',
         
@@ -153,14 +153,14 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
         </div>
       )}
       
-      <div className="font-semibold truncate customer-name"
+      <div className="font-semibold customer-name"
            style={{
              fontSize: window.innerWidth <= 767 ? '8px' : '14px',
              marginBottom: '0px',
              lineHeight: window.innerWidth <= 767 ? '1.1' : '1.2',
-             whiteSpace: 'nowrap',
-             overflow: 'hidden',
-             textOverflow: 'ellipsis',
+             wordWrap: 'break-word',
+             overflowWrap: 'break-word',
+             hyphens: 'auto',
            }}>
         {customerName}
       </div>
@@ -170,20 +170,23 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
              style={{
                fontSize: window.innerWidth <= 767 ? '7px' : '12px',
                lineHeight: '1.1',
-               whiteSpace: 'nowrap',
-               overflow: 'hidden',
-               textOverflow: 'ellipsis',
+               wordWrap: 'break-word',
+               overflowWrap: 'break-word',
+               hyphens: 'auto',
              }}>
           MÜŞTERİ GELMEDİ
         </div>
       )}
       
       {/* Hizmet adını hem mobilde hem masaüstünde göster */}
-      <div className="text-gray-700 service-name leading-tight truncate"
+      <div className="text-gray-700 service-name leading-tight"
            style={{
              fontSize: window.innerWidth <= 767 ? '6px' : '12px',
              lineHeight: '1.1',
              marginBottom: '0px',
+             wordWrap: 'break-word',
+             overflowWrap: 'break-word',
+             hyphens: 'auto',
            }}>
         {serviceNames}
       </div>
@@ -193,9 +196,8 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
              fontSize: window.innerWidth <= 767 ? '7px' : '10px',
              lineHeight: '1.1',
              marginTop: '1px',
-             whiteSpace: 'nowrap',
-             overflow: 'hidden',
-             textOverflow: 'ellipsis',
+             wordWrap: 'break-word',
+             overflowWrap: 'break-word',
            }}>
         {appointment.time} -{' '}
         {new Date(
@@ -644,7 +646,7 @@ const Appointments = () => {
             className="grid border-b border-gray-200 relative z-20 bg-gray-50 sticky top-0 left-0 calendar-header-grid"
             style={{
               '--employee-count': employees.length,
-              'grid-template-columns': `60px repeat(${employees.length}, minmax(120px, 1fr))`
+              'grid-template-columns': `60px repeat(${employees.length}, 1fr)`
             }}
           >
             <div className="py-2 px-1 sm:py-3 sm:px-2 border-r border-gray-200 font-semibold text-xs sm:text-sm text-gray-700 text-center time-column-sticky flex items-center justify-center">
@@ -658,9 +660,9 @@ const Appointments = () => {
               return (
                 <div
                   key={emp._id}
-                  className={`py-2 px-1 sm:py-3 sm:px-2 text-xs sm:text-sm text-center font-semibold text-gray-800 ${colorClass} ${borderColorClass} border-r`}
+                  className={`py-2 px-1 sm:py-3 sm:px-2 text-xs sm:text-sm text-center font-semibold text-gray-800 ${colorClass} ${borderColorClass} border-r employee-header-cell`}
                 >
-                  <span className="truncate">{emp.name}</span>
+                  <span className="truncate block">{emp.name}</span>
                 </div>
               );
             })}
@@ -670,7 +672,7 @@ const Appointments = () => {
             className="relative grid calendar-body-grid"
             style={{
               '--employee-count': employees.length,
-              'grid-template-columns': `60px repeat(${employees.length}, minmax(120px, 1fr))`
+              'grid-template-columns': `60px repeat(${employees.length}, 1fr)`
             }}
           >
             <div className="time-column-sticky bg-white" style={{ width: '60px' }}>
@@ -694,12 +696,7 @@ const Appointments = () => {
             {employees.map(emp => (
               <div 
                 key={emp._id} 
-                className="relative border-r border-gray-100 bg-white"
-                style={{ 
-                  minWidth: '120px',
-                  width: '100%',
-                  position: 'relative'
-                }}
+                className="relative border-r border-gray-100 bg-white employee-column"
               >
                 {timeSlots.map((time) => (
                   <TimeSlot

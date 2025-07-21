@@ -24,7 +24,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   return (
     <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
       isOpen ? 'translate-x-0' : '-translate-x-full'
-    } lg:translate-x-0`}>
+    } xl:translate-x-0`}>
       
       {/* Logo ve başlık */}
       <div className="p-6 border-b border-gray-200">

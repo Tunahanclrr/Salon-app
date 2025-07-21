@@ -1,12 +1,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 // Randevu ekleme thunk'ı
 export const addAppointment = createAsyncThunk(
   'appointments/addAppointment',
   async (appointment, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post('http://localhost:4000/api/appointments', appointment);
+      const { data } = await axios.post(`${API_BASE_URL}/api/appointments`, appointment);
       return data;
     } catch (err) {
       const msg = err.response?.data?.message || 'Sunucu hatası';
@@ -15,12 +16,17 @@ export const addAppointment = createAsyncThunk(
   }
 );
 
-// Randevuları çekme thunk'ı
+// Randevuları getirme thunk'ı
 export const fetchAppointments = createAsyncThunk(
   'appointments/fetchAppointments',
-  async () => {
-    const response = await axios.get('http://localhost:4000/api/appointments');
-    return response.data;
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/appointments`);
+      return response.data;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Sunucu hatası';
+      return rejectWithValue(msg);
+    }
   }
 );
 
@@ -29,13 +35,13 @@ export const updateAppointment = createAsyncThunk(
   'appointments/updateAppointment',
   async ({ id, appointmentData }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.put(
-        `http://localhost:4000/api/appointments/${id}`,
+      const response = await axios.put(
+        `${API_BASE_URL}/api/appointments/${id}`,
         appointmentData
       );
-      return data;
+      return response.data;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Güncelleme sırasında hata oluştu';
+      const msg = err.response?.data?.message || 'Sunucu hatası';
       return rejectWithValue(msg);
     }
   }
@@ -44,15 +50,15 @@ export const updateAppointment = createAsyncThunk(
 // Müşteri gelmedi durumunu güncelleme thunk'ı
 export const updateCustomerNotArrived = createAsyncThunk(
   'appointments/updateCustomerNotArrived',
-  async ({ appointmentId, customerNotArrived }, { rejectWithValue }) => {
+  async ({ appointmentId, notArrived }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.put(
-        `http://localhost:4000/api/appointments/${appointmentId}/customer-not-arrived`,
-        { customerNotArrived }
+      const response = await axios.patch(
+        `${API_BASE_URL}/api/appointments/${appointmentId}/customer-not-arrived`,
+        { customerNotArrived: notArrived }
       );
-      return data;
+      return response.data;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Müşteri gelmedi durumu güncellenirken hata oluştu';
+      const msg = err.response?.data?.message || 'Sunucu hatası';
       return rejectWithValue(msg);
     }
   }

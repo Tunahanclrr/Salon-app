@@ -12,14 +12,14 @@
 .calendar-header-grid {
   display: grid;
   min-width: max-content;
-  grid-template-columns: minmax(50px, auto) repeat(var(--employee-count), minmax(100px, 1fr));
+  grid-template-columns: minmax(50px, auto) repeat(var(--employee-count), 1fr);
   width: 100%;
 }
 
 .calendar-body-grid {
   display: grid;
   min-width: max-content;
-  grid-template-columns: 60px repeat(var(--employee-count), minmax(100px, 1fr));
+  grid-template-columns: 60px repeat(var(--employee-count), 1fr);
   width: 100%;
 }
 
@@ -30,6 +30,15 @@
   background-color: white;
   border-right: 1px solid #e5e7eb;
   box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
+}
+
+.employee-column {
+  min-width: 120px;
+  width: 100%;
+}
+
+.employee-header-cell {
+  min-width: 120px;
 }
 
 /* Tablet ve büyük ekranlar için ayarlar */
@@ -63,19 +72,15 @@
 @media (max-width: 767px) {
   .calendar-header-grid,
   .calendar-body-grid {
-    grid-template-columns: 45px repeat(auto-fit, minmax(65px, 1fr));
-    overflow-x: scroll;
+    grid-template-columns: 45px repeat(var(--employee-count), minmax(80px, 1fr));
+    overflow-x: auto;
     min-width: max-content;
   }
 
-  .calendar-header-grid > div,
-  .calendar-body-grid > div {
-    min-width: 65px;
-    max-width: 65px;
-  }
-
-  .employee-column {
-    margin-left: 2px;
+  .employee-column,
+  .employee-header-cell {
+    min-width: 80px;
+    max-width: none;
   }
 
   .time-column-sticky {
@@ -96,30 +101,29 @@
   .appointment-mobile .customer-name {
     font-size: 8px;
     font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
   }
 
   .appointment-mobile .not-arrived-text {
     font-size: 7px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
   }
 
   .appointment-mobile .service-name {
     font-size: 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
   }
 
   .appointment-mobile .time-info {
     font-size: 7px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   .appointment-mobile .close-icon {
@@ -132,13 +136,38 @@
 
 /* Tablet cihazlar için özel stiller */
 @media (min-width: 768px) and (max-width: 1023px) {
-  .calendar-header-grid > div,
-  .calendar-body-grid > div {
-    min-width: 90px;
+  .calendar-header-grid,
+  .calendar-body-grid {
+    grid-template-columns: 60px repeat(var(--employee-count), minmax(100px, 1fr));
+  }
+  
+  .employee-column,
+  .employee-header-cell {
+    min-width: 100px;
   }
   
   .appointment-tablet {
-    font-size: 9px !important;
+    font-size: 10px !important;
     padding: 3px 4px !important;
+  }
+  
+  .appointment-tablet .customer-name {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .appointment-tablet .service-name {
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+
+  .appointment-tablet .time-info {
+    font-size: 8px;
+  }
+
+  .appointment-tablet .not-arrived-text {
+    font-size: 10px;
+    font-weight: 700;
   }
 }

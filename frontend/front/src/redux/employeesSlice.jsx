@@ -1,35 +1,31 @@
 // src/redux/employeesSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
-// Çalışanları API'den çek
+// Çalışanları getirme thunk'ı
 export const fetchEmployees = createAsyncThunk(
   'employees/fetchEmployees',
-  async () => {
-    const response = await axios.get('http://localhost:4000/api/employees');
-    return response.data;
-  }
-);
-
-// Çalışan silme
-export const deleteEmployee = createAsyncThunk(
-  'employees/deleteEmployee',
-  async (id) => {
-    await axios.delete(`http://localhost:4000/api/employees/${id}`);
-    return id;
-  }
-);
-export const addEmployee = createAsyncThunk(
-  'employees/addEmployee',
-  async (employeeData, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.post('http://localhost:4000/api/employees', employeeData);
-      return response.data.data; // 
+      const response = await axios.get(`${API_BASE_URL}/api/employees`);
+      return response.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || 'Çalışan eklenemedi');
+      const msg = err.response?.data?.message || 'Sunucu hatası';
+      return rejectWithValue(msg);
     }
   }
 );
+
+export const deleteEmployee = createAsyncThunk('employees/deleteEmployee', async (id) => {
+  await axios.delete(`${API_BASE_URL}/api/employees/${id}`);
+  return id;
+});
+
+export const addEmployee = createAsyncThunk('employees/addEmployee', async (employeeData) => {
+  const response = await axios.post(`${API_BASE_URL}/api/employees`, employeeData);
+  return response.data;
+});
 
 const employeesSlice = createSlice({
   name: 'employees',

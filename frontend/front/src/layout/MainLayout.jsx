@@ -8,8 +8,8 @@ export default function MainLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      {/* Mobile and tablet menu button */}
+      <div className="xl:hidden fixed top-4 left-4 z-50">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="bg-white p-2 rounded-lg shadow-md hover:shadow-lg transition-shadow"
@@ -26,16 +26,16 @@ export default function MainLayout() {
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
       {/* Main content */}
-      <div className="lg:ml-72 transition-all duration-300">
-        <main className="p-4 lg:p-8">
+      <div className="xl:ml-72 transition-all duration-300">
+        <main className="p-4 xl:p-8">
           <Outlet />
         </main>
       </div>
 
-      {/* Mobile overlay */}
+      {/* Mobile and tablet overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 xl:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
