@@ -1,24 +1,25 @@
 const express = require('express');
 const router = express.Router();
 const packageSaleController = require('../controllers/packageSaleController');
+const { authenticateToken, requirePermission } = require('../middleware/auth');
 
 // Paket satış rotaları
-router.post('/package-sales', packageSaleController.createPackageSale);
-router.get('/package-sales', packageSaleController.getAllPackageSales);
-router.get('/package-sales/:id', packageSaleController.getPackageSaleById);
-router.put('/package-sales/:id', packageSaleController.updatePackageSale);
+router.get('/package-sales', authenticateToken, requirePermission('canViewPackages'), packageSaleController.getAllPackageSales);
+router.get('/package-sales/:id', authenticateToken, requirePermission('canViewPackages'), packageSaleController.getPackageSaleById);
+router.post('/package-sales', authenticateToken, requirePermission('canEditPackages'), packageSaleController.createPackageSale);
+router.put('/package-sales/:id', authenticateToken, requirePermission('canEditPackages'), packageSaleController.updatePackageSale);
 
 // Taksit ödemeleri
-router.post('/package-sales/:id/installments/:installmentIndex/pay', packageSaleController.payInstallment);
+router.post('/package-sales/:id/installments/:installmentIndex/pay', authenticateToken, requirePermission('canEditPackages'), packageSaleController.payInstallment);
 
 // Tahsilat işlemleri
 const paymentController = require('../controllers/paymentController');
-router.post('/package-sales/:id/payments', paymentController.addPayment);
+router.post('/package-sales/:id/payments', authenticateToken, requirePermission('canEditPackages'), paymentController.addPayment);
 
 // Hizmet kullanımı
-router.post('/package-sales/:id/use-service', packageSaleController.usePackageService);
+router.post('/package-sales/:id/use-service', authenticateToken, requirePermission('canEditPackages'), packageSaleController.usePackageService);
 
 // Müşteri paketleri
-router.get('/customers/:customerId/packages', packageSaleController.getCustomerPackages);
+router.get('/customers/:customerId/packages', authenticateToken, requirePermission('canViewPackages'), packageSaleController.getCustomerPackages);
 
 module.exports = router;

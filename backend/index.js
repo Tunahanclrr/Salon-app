@@ -21,9 +21,10 @@ app.get('/', (req, res) => {
     res.send('Backend çalışıyor!'); // "/ " adresine gelen isteklerin yanıtı olarak bu mesaj döndürülür.
 });
 
-// Employee routes
-const employeeRoutes = require('./routes/employeeRoutes');
-app.use('/api', employeeRoutes);
+// Auth routes
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
+
 const appointmentRoutes = require('./routes/appointmentRoutes');
 app.use('/api', appointmentRoutes);
 //müşteri route

@@ -1,6 +1,6 @@
 const PackageSale = require('../models/PackageSale');
 const Customer = require('../models/Customer');
-const Employee = require('../models/Employee');
+const User = require('../models/User');
 const Service = require('../models/Services');
 const { DateTime } = require('luxon');
 
@@ -59,7 +59,7 @@ exports.createPackageSale = async (req, res) => {
         $addToSet: { packageSales: packageSale._id }
       });
 
-      await Employee.findByIdAndUpdate(seller, {
+      await User.findByIdAndUpdate(seller, {
         $addToSet: { packageSales: packageSale._id }
       });
 
@@ -157,7 +157,7 @@ exports.createPackageSale = async (req, res) => {
     });
 
     // Çalışan bilgilerini güncelle ve satış kaydını ekle
-    await Employee.findByIdAndUpdate(seller, {
+    await User.findByIdAndUpdate(seller, {
       $addToSet: { packageSales: packageSale._id }
     });
 

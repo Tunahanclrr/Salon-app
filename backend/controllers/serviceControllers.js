@@ -41,17 +41,40 @@ exports.editService = async (req,res)=>{
     const { id } = req.params;
     const { name, duration, price } = req.body;
     
+    console.log('🔧 Edit service request:');
+    console.log('ID:', id);
+    console.log('Request body:', req.body);
+    console.log('Name:', name, 'Type:', typeof name);
+    console.log('Duration:', duration, 'Type:', typeof duration);
+    console.log('Price:', price, 'Type:', typeof price);
+    
     if(!id) return res.status(400).json({message:'ID gerekli'});
-    if(!name || !duration || !price) return res.status(400).json({message:'İsim, süre ve fiyat zorunlu'});
+    
+    // Validasyon kontrolü - boş string ve undefined/null kontrolü
+    if(!name || name.trim() === '') {
+      console.log('❌ Name validation failed');
+      return res.status(400).json({message:'İsim zorunlu'});
+    }
+    if(!duration || duration === '' || isNaN(duration) || Number(duration) <= 0) {
+      console.log('❌ Duration validation failed');
+      return res.status(400).json({message:'Geçerli süre zorunlu'});
+    }
+    if(price === undefined || price === null || price === '' || isNaN(price) || Number(price) < 0) {
+      console.log('❌ Price validation failed');
+      return res.status(400).json({message:'Geçerli fiyat zorunlu'});
+    }
+    
+    console.log('✅ All validations passed');
     
     const updatedService = await Service.findByIdAndUpdate(
       id, 
-      { name, duration, price },
+      { name: name.trim(), duration: Number(duration), price: Number(price) },
       { new: true, runValidators: true }
     );
     
     if(!updatedService) return res.status(404).json({message:'Hizmet bulunamadı'});
     
+    console.log('✅ Service updated successfully:', updatedService);
     res.status(200).json({ message:'Hizmet güncellendi', data: updatedService });
   }catch(err){
     console.error('Edit service error:', err);

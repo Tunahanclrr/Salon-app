@@ -1,6 +1,6 @@
 const PackageSale = require('../models/PackageSale');
 const Customer = require('../models/Customer');
-const Employee = require('../models/Employee');
+const User = require('../models/User');
 
 // Paket satışına ödeme ekle
 exports.addPayment = async (req, res) => {
