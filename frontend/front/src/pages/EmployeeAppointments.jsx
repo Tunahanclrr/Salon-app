@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
-import { FiUser, FiPhone, FiMail, FiClock, FiCalendar, FiCheckCircle, FiXCircle, FiArrowLeft, FiPackage } from 'react-icons/fi';
-import { fetchEmployees } from '../redux/employeesSlice';
-import { updateCustomerNotArrived } from '../redux/appointmentsSlice';
+import { FiUser, FiPhone, FiMail, FiClock, FiCalendar, FiCheckCircle, FiXCircle, FiArrowLeft, FiPackage, FiGrid, FiList } from 'react-icons/fi';
+import { fetchUsers } from '../redux/usersSlice';
+import { fetchAppointments, updateCustomerNotArrived } from '../redux/appointmentsSlice';
 import { fetchPackageSales } from '../redux/packageSalesSlice';
 import { fetchPackages } from '../redux/packagesSlice';
+import { selectCurrentUser, selectIsAdmin } from '../redux/authSlice';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,22 +14,63 @@ export default function EmployeeAppointments() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { id } = useParams();
-  const employees = useSelector(state => state.employees.items);
-  const status = useSelector(state => state.employees.status);
+  const users = useSelector(state => state.users.items);
+  const usersStatus = useSelector(state => state.users.status);
+  const appointments = useSelector(state => state.appointments.items);
   const packageSales = useSelector(state => state.packageSales.items);
   const packages = useSelector(state => state.packages.items);
+  const currentUser = useSelector(selectCurrentUser);
+  const isAdmin = useSelector(selectIsAdmin);
   const [filter, setFilter] = useState('all'); // all, completed, not-arrived
   const [packageFilter, setPackageFilter] = useState('all'); // all, active, completed
+  const [viewMode, setViewMode] = useState('list'); // list, calendar
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
-    if (status === 'idle') {
-      dispatch(fetchEmployees());
+    if (usersStatus === 'idle') {
+      dispatch(fetchUsers());
     }
+    dispatch(fetchAppointments());
     dispatch(fetchPackageSales());
     dispatch(fetchPackages());
-  }, [dispatch, status]);
+  }, [dispatch, usersStatus]);
 
-  const employee = employees.find(emp => emp._id === id);
+  // Kullanıcı yetkisi kontrolü - sadece admin veya kendi randevularını görebilir
+  const canViewEmployee = isAdmin || (currentUser && currentUser._id === id);
+  
+  if (!canViewEmployee) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-xl shadow-lg text-center">
+          <FiXCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Yetkisiz Erişim</h2>
+          <p className="text-gray-600 mb-6">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            Ana Sayfaya Dön
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const employee = users.find(user => user._id === id);
+  
+  // Bu çalışanın randevularını filtrele
+  const employeeAppointments = appointments.filter(app => {
+    if (!app.employee) return false;
+    
+    // Employee ID'sini doğru şekilde al
+    const employeeId = typeof app.employee === 'object' && app.employee !== null 
+      ? app.employee._id 
+      : app.employee;
+    
+    // Hem string hem obje formatını kontrol et
+    return employeeId === id || app.employee === id || 
+           (app.employee && app.employee._id === id);
+  });
 
   const getPackageName = (packageId) => {
     // Eğer packageId bir obje ise (populate edilmiş)
@@ -44,14 +86,14 @@ export default function EmployeeAppointments() {
     try {
       await dispatch(updateCustomerNotArrived({ appointmentId, customerNotArrived })).unwrap();
       toast.success(customerNotArrived ? 'Müşteri gelmedi olarak işaretlendi' : 'Müşteri geldi olarak işaretlendi');
-      // Çalışan verilerini yeniden çek
-      dispatch(fetchEmployees());
+      // Randevuları yeniden çek
+      dispatch(fetchAppointments());
     } catch (error) {
       toast.error('Durum güncellenirken hata oluştu');
     }
   };
 
-  if (status === 'loading') {
+  if (usersStatus === 'loading') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-lg">
@@ -80,8 +122,6 @@ export default function EmployeeAppointments() {
     );
   }
 
-  const appointments = Array.isArray(employee.appointments) ? employee.appointments : [];
-  
   // Personelin sattığı paketleri filtrele
   const employeePackageSales = packageSales.filter(pkg => 
     pkg.seller === id || (pkg.seller && pkg.seller._id === id)
@@ -95,16 +135,16 @@ export default function EmployeeAppointments() {
   });
   
   // Filtreleme
-  const filteredAppointments = appointments.filter(app => {
+  const filteredAppointments = employeeAppointments.filter(app => {
     if (filter === 'completed') return !app.customerNotArrived;
     if (filter === 'not-arrived') return app.customerNotArrived;
     return true;
   });
 
   // İstatistikler
-  const totalAppointments = appointments.length;
-  const completedAppointments = appointments.filter(app => !app.customerNotArrived).length;
-  const notArrivedAppointments = appointments.filter(app => app.customerNotArrived).length;
+  const totalAppointments = employeeAppointments.length;
+  const completedAppointments = employeeAppointments.filter(app => !app.customerNotArrived).length;
+  const notArrivedAppointments = employeeAppointments.filter(app => app.customerNotArrived).length;
 
   // Paket satış istatistikleri
   const totalPackageSales = employeePackageSales.length;
@@ -122,6 +162,90 @@ export default function EmployeeAppointments() {
     return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' })
       .format(amount)
       .replace('₺', '') + ' ₺';
+  };
+
+  // Takvim için sabitler
+  const PX_PER_15_MINUTES = 60;
+  const CALENDAR_START_HOUR = 9;
+  const CALENDAR_START_HOUR_IN_MINUTES = CALENDAR_START_HOUR * 60;
+
+  // Zaman slotları
+  const timeSlots = useMemo(() => {
+    const slots = [];
+    for (let h = CALENDAR_START_HOUR; h < 23; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        if (h === 22 && m > 30) continue;
+        slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+      }
+    }
+    return slots;
+  }, []);
+
+  // Seçili tarih için randevuları filtrele
+  const calendarAppointments = employeeAppointments.filter(app => app.date === selectedDate);
+
+  // Takvim görünümü için randevu bileşeni
+  const CalendarAppointment = ({ appointment }) => {
+    const customerName = appointment.customer?.name || 'Müşteri';
+    const serviceNames = appointment.services?.map(s => s.name).join(', ') || 'Hizmet';
+
+    const [startHour, startMinute] = appointment.time.split(':').map((val) => parseInt(val, 10));
+    const startTimeInMinutes = startHour * 60 + startMinute;
+    const durationInMinutes = appointment.duration || 30;
+
+    const top = Math.round(
+      (startTimeInMinutes - CALENDAR_START_HOUR_IN_MINUTES) * (PX_PER_15_MINUTES / 15)
+    );
+    const height = Math.round(durationInMinutes * (PX_PER_15_MINUTES / 15));
+
+    return (
+      <div
+        className={`absolute rounded-md font-medium shadow-sm cursor-pointer transition-all leading-tight ${
+          appointment.customerNotArrived 
+            ? 'bg-red-200 border-red-400 text-red-800 opacity-75' 
+            : 'bg-blue-200 border-blue-400 text-blue-800'
+        }`}
+        style={{
+          top: `${top}px`,
+          height: `${height}px`,
+          width: 'calc(100% - 8px)',
+          left: '4px',
+          fontSize: '12px',
+          padding: '4px 8px',
+          lineHeight: '1.3',
+          overflow: 'hidden',
+          wordWrap: 'break-word',
+          boxSizing: 'border-box',
+          border: '1px solid',
+          zIndex: 20,
+        }}
+      >
+        {appointment.customerNotArrived && (
+          <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full flex items-center justify-center font-bold"
+               style={{ width: '12px', height: '12px', fontSize: '6px' }}>
+            ✕
+          </div>
+        )}
+        
+        <div className="font-semibold" style={{ fontSize: '14px', marginBottom: '2px' }}>
+          {customerName}
+        </div>
+        
+        {appointment.customerNotArrived && (
+          <div className="text-red-700 font-bold leading-tight" style={{ fontSize: '10px' }}>
+            MÜŞTERİ GELMEDİ
+          </div>
+        )}
+        
+        <div className="text-gray-700 leading-tight" style={{ fontSize: '11px', marginBottom: '2px' }}>
+          {serviceNames}
+        </div>
+        
+        <div className="text-gray-600" style={{ fontSize: '10px' }}>
+          {appointment.time} ({durationInMinutes} dk)
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -191,165 +315,275 @@ export default function EmployeeAppointments() {
           </div>
 
           {/* Filtreler */}
-          <div className="flex flex-wrap gap-2 mt-4 sm:mt-6">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                filter === 'all'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Tümü ({totalAppointments})
-            </button>
-            <button
-              onClick={() => setFilter('completed')}
-              className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                filter === 'completed'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Tamamlanan ({completedAppointments})
-            </button>
-            <button
-              onClick={() => setFilter('not-arrived')}
-              className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                filter === 'not-arrived'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Gelmedi ({notArrivedAppointments})
-            </button>
+          <div className="flex flex-wrap gap-2 mt-4 sm:mt-6 justify-between items-center">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
+                  filter === 'all'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Tümü ({totalAppointments})
+              </button>
+              <button
+                onClick={() => setFilter('completed')}
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
+                  filter === 'completed'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Tamamlanan ({completedAppointments})
+              </button>
+              <button
+                onClick={() => setFilter('not-arrived')}
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
+                  filter === 'not-arrived'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Gelmedi ({notArrivedAppointments})
+              </button>
+            </div>
+
+            {/* Görünüm Değiştirme Butonları */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors flex items-center gap-2 ${
+                  viewMode === 'list'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <FiList className="h-4 w-4" />
+                Liste
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors flex items-center gap-2 ${
+                  viewMode === 'calendar'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <FiGrid className="h-4 w-4" />
+                Takvim
+              </button>
+            </div>
           </div>
+
+          {/* Takvim görünümü için tarih seçici */}
+          {viewMode === 'calendar' && (
+            <div className="flex items-center gap-2 mt-4 bg-gray-50 p-3 rounded-lg">
+              <FiCalendar className="text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Tarih:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-white border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          )}
         </div>
 
         {/* Randevular */}
-        {filteredAppointments.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-lg p-6 sm:p-12 text-center mb-6 sm:mb-8">
-            <FiCalendar className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Randevu Bulunamadı</h3>
-            <p className="text-sm sm:text-base text-gray-600">
-              {filter === 'all' 
-                ? 'Bu çalışan için henüz randevu bulunmuyor.'
-                : filter === 'completed'
-                ? 'Tamamlanan randevu bulunmuyor.'
-                : 'Gelmedi olarak işaretlenen randevu bulunmuyor.'
-              }
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-            {filteredAppointments.map(app => (
-              <div
-                key={app._id}
-                className={`bg-white rounded-xl shadow-lg border-l-4 hover:shadow-xl transition-all duration-300 ${
-                  app.customerNotArrived 
-                    ? 'border-red-500 bg-red-50' 
-                    : 'border-green-500 hover:border-indigo-500'
-                }`}
-              >
-                <div className="p-4 sm:p-6">
-                  {/* Header */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-2 rounded-full ${app.customerNotArrived ? 'bg-red-100' : 'bg-green-100'}`}>
-                        <FiUser className={`h-4 w-4 sm:h-5 sm:w-5 ${app.customerNotArrived ? 'text-red-600' : 'text-green-600'}`} />
-                      </div>
-                      <div>
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-800">{app.customer?.name}</h3>
-                        <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          app.customerNotArrived 
-                            ? 'bg-red-100 text-red-800' 
-                            : 'bg-green-100 text-green-800'
-                        }`}>
-                          {app.customerNotArrived ? (
-                            <>
-                              <FiXCircle className="h-3 w-3 mr-1" />
-                              Gelmedi
-                            </>
-                          ) : (
-                            <>
-                              <FiCheckCircle className="h-3 w-3 mr-1" />
-                              Tamamlandı
-                            </>
-                          )}
+        {viewMode === 'list' ? (
+          // Liste Görünümü
+          filteredAppointments.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-lg p-6 sm:p-12 text-center mb-6 sm:mb-8">
+              <FiCalendar className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Randevu Bulunamadı</h3>
+              <p className="text-sm sm:text-base text-gray-600">
+                {filter === 'all' 
+                  ? 'Bu çalışan için henüz randevu bulunmuyor.'
+                  : filter === 'completed'
+                  ? 'Tamamlanan randevu bulunmuyor.'
+                  : 'Gelmedi olarak işaretlenen randevu bulunmuyor.'
+                }
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              {filteredAppointments.map(app => (
+                <div
+                  key={app._id}
+                  className={`bg-white rounded-xl shadow-lg border-l-4 hover:shadow-xl transition-all duration-300 ${
+                    app.customerNotArrived 
+                      ? 'border-red-500 bg-red-50' 
+                      : 'border-green-500 hover:border-indigo-500'
+                  }`}
+                >
+                  <div className="p-4 sm:p-6">
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-2 rounded-full ${app.customerNotArrived ? 'bg-red-100' : 'bg-green-100'}`}>
+                          <FiUser className={`h-4 w-4 sm:h-5 sm:w-5 ${app.customerNotArrived ? 'text-red-600' : 'text-green-600'}`} />
                         </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Müşteri Bilgileri */}
-                  <div className="space-y-2 sm:space-y-3 mb-4">
-                    <div className="flex items-center text-gray-600">
-                      <FiPhone className="h-4 w-4 mr-2 sm:mr-3 text-gray-400" />
-                      <span className="text-xs sm:text-sm">{app.customer?.phone || 'Telefon bilgisi yok'}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <FiMail className="h-4 w-4 mr-2 sm:mr-3 text-gray-400" />
-                      <span className="text-xs sm:text-sm">{app.customer?.email || 'E-posta bilgisi yok'}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <FiCalendar className="h-4 w-4 mr-2 sm:mr-3 text-gray-400" />
-                      <span className="text-xs sm:text-sm">{new Date(app.date).toLocaleDateString('tr-TR')}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <FiClock className="h-4 w-4 mr-2 sm:mr-3 text-gray-400" />
-                      <span className="text-xs sm:text-sm">{app.time}</span>
-                    </div>
-                  </div>
-
-                  {/* Hizmetler */}
-                  {app.services && app.services.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">Hizmetler:</h4>
-                      <div className="space-y-2">
-                        {app.services.map((service, index) => (
-                          <div key={index} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-                            <span className="text-xs sm:text-sm text-gray-700">{service.name}</span>
-                            <div className="flex items-center space-x-2 text-xs text-gray-500">
-                              <span>{service.duration} dk</span>
-                              <span className="text-green-600 font-medium">{service.price} ₺</span>
-                            </div>
+                        <div>
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-800">{app.customer?.name}</h3>
+                          <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            app.customerNotArrived 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {app.customerNotArrived ? (
+                              <>
+                                <FiXCircle className="h-3 w-3 mr-1" />
+                                Gelmedi
+                              </>
+                            ) : (
+                              <>
+                                <FiCheckCircle className="h-3 w-3 mr-1" />
+                                Tamamlandı
+                              </>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                      <div className="mt-2 pt-2 border-t border-gray-200">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs sm:text-sm font-semibold text-gray-700">Toplam:</span>
-                          <span className="text-base sm:text-lg font-bold text-green-600">
-                            {app.services.reduce((sum, service) => sum + (service.price || 0), 0)} ₺
-                          </span>
                         </div>
                       </div>
                     </div>
-                  )}
 
-                  {/* Notlar */}
-                  {app.notes && (
-                    <div className="mb-4">
-                      <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-1">Notlar:</h4>
-                      <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2 rounded-lg">{app.notes}</p>
+                    {/* Müşteri Bilgileri */}
+                    <div className="space-y-2 sm:space-y-3 mb-4">
+                      <div className="flex items-center text-gray-600">
+                        <FiPhone className="h-4 w-4 mr-2 sm:mr-3 text-gray-400" />
+                        <span className="text-xs sm:text-sm">{app.customer?.phone || 'Telefon bilgisi yok'}</span>
+                      </div>
+                      <div className="flex items-center text-gray-600">
+                        <FiMail className="h-4 w-4 mr-2 sm:mr-3 text-gray-400" />
+                        <span className="text-xs sm:text-sm">{app.customer?.email || 'E-posta bilgisi yok'}</span>
+                      </div>
+                      <div className="flex items-center text-gray-600">
+                        <FiCalendar className="h-4 w-4 mr-2 sm:mr-3 text-gray-400" />
+                        <span className="text-xs sm:text-sm">{new Date(app.date).toLocaleDateString('tr-TR')}</span>
+                      </div>
+                      <div className="flex items-center text-gray-600">
+                        <FiClock className="h-4 w-4 mr-2 sm:mr-3 text-gray-400" />
+                        <span className="text-xs sm:text-sm">{app.time}</span>
+                      </div>
                     </div>
-                  )}
 
-                  {/* Durum Değiştirme Butonu */}
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => handleCustomerNotArrived(app._id, !app.customerNotArrived)}
-                      className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
-                        app.customerNotArrived
-                          ? 'bg-green-600 hover:bg-green-700 text-white'
-                          : 'bg-red-600 hover:bg-red-700 text-white'
-                      }`}
-                    >
-                      {app.customerNotArrived ? 'Müşteri Geldi' : 'Müşteri Gelmedi'}
-                    </button>
+                    {/* Hizmetler */}
+                    {app.services && app.services.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">Hizmetler:</h4>
+                        <div className="space-y-2">
+                          {app.services.map((service, index) => (
+                            <div key={index} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+                              <span className="text-xs sm:text-sm text-gray-700">{service.name}</span>
+                              <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                <span>{service.duration} dk</span>
+                                <span className="text-green-600 font-medium">{service.price} ₺</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs sm:text-sm font-semibold text-gray-700">Toplam:</span>
+                            <span className="text-base sm:text-lg font-bold text-green-600">
+                              {app.services.reduce((sum, service) => sum + (service.price || 0), 0)} ₺
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notlar */}
+                    {app.notes && (
+                      <div className="mb-4">
+                        <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-1">Notlar:</h4>
+                        <p className="text-xs sm:text-sm text-gray-600 bg-gray-50 p-2 rounded-lg">{app.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Durum Değiştirme Butonu */}
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => handleCustomerNotArrived(app._id, !app.customerNotArrived)}
+                        className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                          app.customerNotArrived
+                            ? 'bg-green-600 hover:bg-green-700 text-white'
+                            : 'bg-red-600 hover:bg-red-700 text-white'
+                        }`}
+                      >
+                        {app.customerNotArrived ? 'Müşteri Geldi' : 'Müşteri Gelmedi'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : (
+          // Takvim Görünümü
+          <div className="bg-white rounded-xl shadow-lg mb-6 sm:mb-8 overflow-hidden">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <FiCalendar className="text-indigo-600" />
+                {employee.name} - {new Date(selectedDate).toLocaleDateString('tr-TR')} Randevuları
+              </h3>
+            </div>
+            
+            {calendarAppointments.length === 0 ? (
+              <div className="p-12 text-center">
+                <FiCalendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">Bu Tarihte Randevu Yok</h3>
+                <p className="text-gray-600">
+                  {new Date(selectedDate).toLocaleDateString('tr-TR')} tarihinde {employee.name} için randevu bulunmuyor.
+                </p>
+              </div>
+            ) : (
+              <div className="relative">
+                {/* Takvim Grid */}
+                <div className="grid grid-cols-2 border-b border-gray-200">
+                  <div className="py-3 px-4 border-r border-gray-200 font-semibold text-sm text-gray-700 bg-gray-50">
+                    Saat
+                  </div>
+                  <div className="py-3 px-4 text-sm text-center font-semibold text-gray-800 bg-blue-50">
+                    {employee.name}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 relative">
+                  {/* Zaman Sütunu */}
+                  <div className="border-r border-gray-200">
+                    {timeSlots.map((slot) => (
+                      <div 
+                        key={slot} 
+                        className="text-xs text-gray-500 border-t border-gray-100 flex items-center justify-center bg-white"
+                        style={{ height: '60px' }}
+                      >
+                        {(slot.endsWith(':00') || slot.endsWith(':30')) ? (
+                          <span className="text-right w-full pr-2">{slot}</span>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Randevu Sütunu */}
+                  <div className="relative bg-white">
+                    {timeSlots.map((time) => (
+                      <div
+                        key={time}
+                        className="border-t border-gray-100"
+                        style={{ height: '60px' }}
+                      />
+                    ))}
+                    
+                    {/* Randevular */}
+                    {calendarAppointments.map(app => (
+                      <CalendarAppointment key={app._id} appointment={app} />
+                    ))}
                   </div>
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
 

@@ -1,12 +1,11 @@
 // src/redux/servicesSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { API_BASE_URL } from '../config/api';
+import api from '../config/api';
 
 // Tüm hizmetleri çekme (GET)
 export const fetchServices = createAsyncThunk('services/fetch', async () => {
   console.log('Fetching services from API...');
-  const { data } = await axios.get(`${API_BASE_URL}/api/services`);
+  const { data } = await api.get('/api/services');
   console.log('Services fetched:', data);
   return data;
 });
@@ -17,27 +16,30 @@ export const addService = createAsyncThunk(
   async (service, { rejectWithValue }) => {
     console.log('Adding service:', service);
     try {
-      const { data } = await axios.post(`${API_BASE_URL}/api/services`, service);
-      console.log('Service added successfully:', data);
-      return data;
+      const { data } = await api.post('/api/services', service);
+      console.log('Service added:', data);
+      return data.data;
     } catch (err) {
-      console.error('Error adding service:', err);
-      const msg = err.response?.data?.message || 'Hizmet eklenirken bir sunucu hatası oluştu.';
-      return rejectWithValue(msg);
+      console.error('Add service error:', err);
+      return rejectWithValue(err.response?.data?.message || 'Hizmet eklenemedi');
     }
   }
 );
 
-// Hizmet düzenleme (PUT)
-export const editService = createAsyncThunk(
-  'services/editService',
+// Hizmet güncelleme (PUT)
+export const updateService = createAsyncThunk(
+  'services/updateService',
   async ({ id, data }, { rejectWithValue }) => {
+    console.log('🔧 Redux updateService called with:', { id, data });
+    console.log('🔧 Data being sent to API:', data);
     try {
-      const { data: response } = await axios.put(`${API_BASE_URL}/api/services/${id}`, data);
-      return response;
+      const response = await api.put(`/api/services/${id}`, data);
+      console.log('🔧 API Response:', response.data);
+      return response.data.data;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Hizmet düzenlenirken bir sunucu hatası oluştu.';
-      return rejectWithValue(msg);
+      console.error('❌ Update service error:', err);
+      console.error('❌ Error response:', err.response?.data);
+      return rejectWithValue(err.response?.data?.message || 'Hizmet güncellenemedi');
     }
   }
 );
@@ -46,15 +48,14 @@ export const editService = createAsyncThunk(
 export const deleteService = createAsyncThunk(
   'services/deleteService',
   async (id, { rejectWithValue }) => {
+    console.log('Deleting service:', id);
     try {
-      console.log('Deleting service with ID:', id);
-      const response = await axios.delete(`${API_BASE_URL}/api/services/${id}`);
-      console.log('Delete response:', response.data);
+      await api.delete(`/api/services/${id}`);
+      console.log('Service deleted:', id);
       return id;
     } catch (err) {
-      console.error('Delete error:', err);
-      const msg = err.response?.data?.message || 'Hizmet silinirken bir sunucu hatası oluştu.';
-      return rejectWithValue(msg);
+      console.error('Delete service error:', err);
+      return rejectWithValue(err.response?.data?.message || 'Hizmet silinemedi');
     }
   }
 );
@@ -96,11 +97,11 @@ const servicesSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(editService.pending, (state) => {
+      .addCase(updateService.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(editService.fulfilled, (state, action) => {
+      .addCase(updateService.fulfilled, (state, action) => {
         state.loading = false;
         const updatedService = action.payload.data || action.payload;
         const index = state.items.findIndex(item => item._id === updatedService._id);
@@ -108,7 +109,7 @@ const servicesSlice = createSlice({
           state.items[index] = updatedService;
         }
       })
-      .addCase(editService.rejected, (state, action) => {
+      .addCase(updateService.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

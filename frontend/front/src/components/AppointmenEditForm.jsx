@@ -1,16 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Select from 'react-select';
 
-export default function AppointmentEditForm({
-  initialData,
-  employees,
-  customers,
-  appointments,
-  services,
-  onSubmit,
-  onCancel,
-  onAddCustomer,
-}) {
+const AppointmentEditForm = ({ 
+  initialData, 
+  users, 
+  customers, 
+  services: availableServices, 
+  appointments, 
+  onSubmit, 
+  onCancel, 
+  onAddCustomer 
+}) => {
   const [form, setForm] = useState({
     customerId: '',
     employeeId: '',
@@ -55,7 +55,7 @@ export default function AppointmentEditForm({
       setTotalPrice(price);
       setServiceDuration(duration);
     }
-  }, [initialData, services]);
+  }, [initialData, availableServices]);
 
   // Seçili hizmetler değiştiğinde toplam süre ve fiyatı güncelle
   useEffect(() => {
@@ -88,16 +88,29 @@ export default function AppointmentEditForm({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    console.log('🔧 FORM SUBMIT START - EDIT MODE');
+    console.log('📋 Form state:', form);
+    console.log('📋 Initial data:', initialData);
+    console.log('📋 Selected services:', form.selectedServices);
+    console.log('📋 Total duration:', totalDuration);
   
     const requiredFields = ['customerId', 'employeeId', 'date', 'time'];
     const hasEmpty = requiredFields.some((field) => !form[field]);
     
+    console.log('📋 Required fields check:');
+    requiredFields.forEach(field => {
+      console.log(`  - ${field}:`, form[field]);
+    });
+    
     if (form.selectedServices.length === 0) {
+      console.log('❌ No services selected');
       alert('En az bir hizmet seçmelisiniz.');
       return;
     }
   
     if (hasEmpty) {
+      console.log('❌ Required fields missing:', requiredFields.filter(field => !form[field]));
       alert('Tüm alanları doldurunuz.');
       return;
     }
@@ -109,6 +122,8 @@ export default function AppointmentEditForm({
       price: svc.price,
     }));
 
+    console.log('📋 Selected services data:', selectedServicesData);
+
     const payload = {
       employee: form.employeeId,
       customer: form.customerId,
@@ -119,20 +134,47 @@ export default function AppointmentEditForm({
       notes: form.notes,
       force: false, // Varsayılan olarak force false
     };
+    
+    console.log('📋 Final payload to send:', JSON.stringify(payload, null, 2));
   
-    // Eğer seçilen saat doluysa, modal sor
-    // isTimeSlotAvailable fonksiyonunu kullanarak kontrol et
+    // Çakışma kontrolü - daha detaylı log
+    console.log('🔍 CONFLICT CHECK START');
+    console.log('📋 Checking for employee:', form.employeeId);
+    console.log('📋 Checking for date:', form.date);
+    console.log('📋 Excluding appointment ID:', initialData?._id);
+    
     const [sh, sm] = form.time.split(':').map(Number);
     const slotStart = new Date(0, 0, 0, sh, sm);
-    const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60000);
+    const slotEnd = new Date(slotStart.getTime() + totalDuration * 60000);
+    
+    console.log('📋 Proposed time slot:', {
+      start: `${sh}:${sm}`,
+      end: `${slotEnd.getHours()}:${slotEnd.getMinutes()}`,
+      duration: totalDuration
+    });
 
     const employeeAppointments = appointments.filter(
-        (app) =>
-            app.employee?._id === form.employeeId &&
-            app.date === form.date &&
-            app._id !== initialData?._id && // Düzenlenen randevuyu hariç tut
-            app.status !== "cancelled"
+        (app) => {
+            const empId = app.employee?._id || app.employee;
+            const matches = empId === form.employeeId &&
+                           app.date === form.date &&
+                           app._id !== initialData?._id && // Düzenlenen randevuyu hariç tut
+                           app.status !== "cancelled";
+            
+            if (matches) {
+              console.log('📋 Found conflicting appointment candidate:', {
+                id: app._id,
+                time: app.time,
+                duration: app.duration,
+                employee: app.employee?.name || app.employee
+              });
+            }
+            
+            return matches;
+        }
     );
+    
+    console.log('📋 Employee appointments on same date:', employeeAppointments.length);
 
     const isConflicting = employeeAppointments.some((app) => {
         if (!app.time) return false;
@@ -141,31 +183,49 @@ export default function AppointmentEditForm({
         const appStart = new Date(0, 0, 0, ah, am);
         const appEnd = new Date(appStart.getTime() + (app.duration || 30) * 60000);
 
-        return (
+        const conflict = (
             (slotStart >= appStart && slotStart < appEnd) ||
             (slotEnd > appStart && slotEnd <= appEnd) ||
             (slotStart <= appStart && slotEnd >= appEnd)
         );
+        
+        if (conflict) {
+          console.log('⚠️ CONFLICT DETECTED with appointment:', {
+            id: app._id,
+            time: app.time,
+            duration: app.duration,
+            appStart: `${appStart.getHours()}:${appStart.getMinutes()}`,
+            appEnd: `${appEnd.getHours()}:${appEnd.getMinutes()}`,
+            proposedStart: `${slotStart.getHours()}:${slotStart.getMinutes()}`,
+            proposedEnd: `${slotEnd.getHours()}:${slotEnd.getMinutes()}`
+          });
+        }
+        
+        return conflict;
     });
     
+    console.log('📋 Is conflicting:', isConflicting);
+    
     if (isConflicting) {
+      console.log('⚠️ Showing conflict modal');
       setPendingSubmit(payload); // Çakışma durumunda payload'u sakla
       setShowConfirmModal(true); // Onay modalını göster
       return;
     }
   
+    console.log('✅ No conflict - submitting directly');
     // Saat uygunsa direkt gönder
     onSubmit(payload);
   };
   
   const serviceOptions = useMemo(() => {
-    return services.map((s) => ({
+    return availableServices.map((s) => ({
       value: s._id,
       label: `${s.name} (${s.duration} dk - ${s.price} ₺)`,
       duration: s.duration,
       price: s.price
     }));
-  }, [services]);
+  }, [availableServices]);
 
   const filteredServiceOptions = useMemo(() => {
     if (!serviceSearch) return serviceOptions;
@@ -185,10 +245,12 @@ export default function AppointmentEditForm({
     );
   }, [customerSearch, customerOptions]);
 
-  const employeeOptions = employees.map(emp => ({
-    value: emp._id,
-    label: `${emp.name} - ${emp.role}`
-  }));
+  const employeeOptions = users
+    .filter((user) => user.role === 'employee' || user.role === 'admin')
+    .map((emp) => ({
+      value: emp._id,
+      label: `${emp.name} - ${emp.job}`,
+    }));
 
   const timeOptions = useMemo(() => {
     if (!form.employeeId || !form.date || serviceDuration === 0) return [];
@@ -408,4 +470,6 @@ export default function AppointmentEditForm({
       )}
     </form>
   );
-}
+};
+
+export default AppointmentEditForm;

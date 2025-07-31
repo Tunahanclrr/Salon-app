@@ -1,13 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { API_BASE_URL } from '../config/api';
+import api from '../config/api';
 
 // Randevu ekleme thunk'ı
 export const addAppointment = createAsyncThunk(
   'appointments/addAppointment',
   async (appointment, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post(`${API_BASE_URL}/api/appointments`, appointment);
+      const { data } = await api.post('/api/appointments', appointment);
       return data;
     } catch (err) {
       const msg = err.response?.data?.message || 'Sunucu hatası';
@@ -19,9 +18,17 @@ export const addAppointment = createAsyncThunk(
 // Randevuları çekme thunk'ı
 export const fetchAppointments = createAsyncThunk(
   'appointments/fetchAppointments',
-  async () => {
-    const response = await axios.get(`${API_BASE_URL}/api/appointments`);
-    return response.data;
+  async (_, { rejectWithValue }) => {
+    try {
+      console.log('🚀 fetchAppointments thunk called');
+      const response = await api.get('/api/appointments');
+      console.log('✅ fetchAppointments response:', response.data);
+      return response.data;
+    } catch (err) {
+      console.log('❌ fetchAppointments error:', err);
+      const msg = err.response?.data?.message || 'Randevular yüklenirken hata oluştu';
+      return rejectWithValue(msg);
+    }
   }
 );
 
@@ -30,8 +37,8 @@ export const updateAppointment = createAsyncThunk(
   'appointments/updateAppointment',
   async ({ id, appointmentData }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.put(
-        `${API_BASE_URL}/api/appointments/${id}`,
+      const { data } = await api.put(
+        `/api/appointments/${id}`,
         appointmentData
       );
       return data;
@@ -47,8 +54,8 @@ export const updateCustomerNotArrived = createAsyncThunk(
   'appointments/updateCustomerNotArrived',
   async ({ appointmentId, customerNotArrived }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.put(
-        `${API_BASE_URL}/api/appointments/${appointmentId}/customer-not-arrived`,
+      const { data } = await api.put(
+        `/api/appointments/${appointmentId}/customer-not-arrived`,
         { customerNotArrived }
       );
       return data;
@@ -71,16 +78,19 @@ const appointmentsSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(addAppointment.fulfilled, (state, action) => {
-        // Bileşen listeyi yeniden çektiği için burada state'i değiştirmiyoruz.
         state.status = 'succeeded';
+        // Backend yalnızca oluşturulan randevuyu döndürüyorsa, listeye ekle
+        if (action.payload && action.payload._id) {
+          state.items.push(action.payload);
+        }
       })
       .addCase(fetchAppointments.pending, (state) => {
         state.status = 'loading';
       })
       .addCase(fetchAppointments.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        // action.payload { appointments: [...] } şeklinde bir obje, bize sadece dizi lazım.
-        state.items = action.payload.appointments;
+        // Backend'ten gelen response formatı: { success: true, data: { appointments: [...] } }
+        state.items = action.payload.data?.appointments || action.payload.appointments || [];
       })
       .addCase(fetchAppointments.rejected, (state, action) => {
         state.status = 'failed';

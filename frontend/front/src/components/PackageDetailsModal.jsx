@@ -2,7 +2,7 @@ import React from 'react';
 import { FiX, FiCalendar, FiDollarSign, FiList, FiUser, FiFileText, FiCreditCard } from 'react-icons/fi';
 import { useSelector } from 'react-redux';
 
-export default function PackageDetailsModal({ packageSale, onClose, formatCurrency, getCustomerName, getEmployeeName }) {
+export default function PackageDetailsModal({ packageSale, onClose, formatCurrency, getCustomerName, getUserName }) {
   const { items: packages } = useSelector(state => state.packages);
 
   const getPackageName = (packageId) => {
@@ -68,7 +68,7 @@ export default function PackageDetailsModal({ packageSale, onClose, formatCurren
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Satış Yapan</p>
-                    <p className="font-medium">{getEmployeeName(packageSale.seller)}</p>
+                    <p className="font-medium">{getUserName(packageSale.seller)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Paket Türü</p>

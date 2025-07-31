@@ -1,12 +1,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { API_BASE_URL } from '../config/api';
+import api from '../config/api';
 
 // Paket satışlarını çekme
 export const fetchPackageSales = createAsyncThunk(
   'packageSales/fetchPackageSales',
   async () => {
-    const response = await axios.get(`${API_BASE_URL}/api/package-sales`);
+    const response = await api.get('/api/package-sales');
     return response.data;
   }
 );
@@ -16,7 +15,7 @@ export const addPackageSale = createAsyncThunk(
   'packageSales/addPackageSale',
   async (packageSale, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/package-sales`, packageSale);
+      const response = await api.post('/api/package-sales', packageSale);
       return response.data;
     } catch (error) {
       console.error('API Error:', error);
@@ -30,7 +29,7 @@ export const updatePackageSale = createAsyncThunk(
   'packageSales/updatePackageSale',
   async ({ id, updates }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(`${API_BASE_URL}/api/package-sales/${id}`, updates);
+      const response = await api.put(`/api/package-sales/${id}`, updates);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Paket satışı güncellenirken hata oluştu');
@@ -44,7 +43,7 @@ export const addInstallmentPayment = createAsyncThunk(
   async ({ id, payment, installmentIndex = 0 }, { rejectWithValue }) => {
     try {
       // Taksit indeksini parametre olarak al
-      const response = await axios.post(`${API_BASE_URL}/api/package-sales/${id}/installments/${installmentIndex}/pay`, {
+      const response = await api.post(`/api/package-sales/${id}/installments/${installmentIndex}/pay`, {
         paymentMethod: payment.paymentMethod,
         paidDate: payment.date,
         amount: payment.amount, // Ödeme tutarını da gönder
@@ -63,7 +62,7 @@ export const makePayment = createAsyncThunk(
   'packageSales/makePayment',
   async ({ id, paymentData }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/package-sales/${id}/payments`, paymentData);
+      const response = await api.post(`/api/package-sales/${id}/payments`, paymentData);
       return response.data;
     } catch (error) {
       console.error('Tahsilat API hatası:', error);
@@ -77,7 +76,7 @@ export const usePackageService = createAsyncThunk(
   'packageSales/usePackageService',
   async ({ id, serviceId, quantity }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/package-sales/${id}/use-service`, {
+      const response = await api.post(`/api/package-sales/${id}/use-service`, {
         serviceId,
         quantity
       });
@@ -92,7 +91,7 @@ export const usePackageService = createAsyncThunk(
 export const fetchCustomerPackageSales = createAsyncThunk(
   'packageSales/fetchCustomerPackageSales',
   async (customerId) => {
-    const response = await axios.get(`${API_BASE_URL}/api/package-sales/customer/${customerId}`);
+    const response = await api.get(`/api/package-sales/customer/${customerId}`);
     return response.data;
   }
 );

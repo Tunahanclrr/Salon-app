@@ -1,34 +1,34 @@
 import React, { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { FaUserFriends, FaUsers, FaCalendarDay, FaListOl } from 'react-icons/fa';
-import { fetchEmployees } from '../redux/employeesSlice';
+import { fetchUsers } from '../redux/usersSlice';
 import { fetchCustomers } from '../redux/customersSlice';
 
 export default function Dashboard() {
   const dispatch = useDispatch();
   
   // Redux store'dan verileri çek
-  const employees = useSelector(state => state.employees.items);
+  const users = useSelector(state => state.users.items);
   const customers = useSelector(state => state.customers.items);
   
   // Yükleme durumları
-  const employeesStatus = useSelector(state => state.employees.status);
+  const usersStatus = useSelector(state => state.users.status);
   const customersStatus = useSelector(state => state.customers.status);
   
   useEffect(() => {
     // Veriler henüz yüklenmediyse veya hata olduysa yeniden çek
-    if (employeesStatus === 'idle') {
-      dispatch(fetchEmployees());
+    if (usersStatus === 'idle') {
+      dispatch(fetchUsers());
     }
     if (customersStatus === 'idle') {
       dispatch(fetchCustomers());
     }
-  }, [dispatch, employeesStatus, customersStatus]);
+  }, [dispatch, usersStatus, customersStatus]);
   
-  // Tüm randevuları employees'dan topla
+  // Tüm randevuları users'dan topla
   const allAppointments = useMemo(() => {
-    return employees.flatMap(emp => emp.appointments || []);
-  }, [employees]);
+    return users.flatMap(user => user.appointments || []);
+  }, [users]);
   
   // Bugünün tarih aralığı
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -39,8 +39,8 @@ export default function Dashboard() {
     return appointmentDate === todayStr;
   });
   
-  // Aktif çalışan sayısı (tüm çalışanlar)
-  const activeEmployees = employees.length;
+  // Aktif çalışan sayısı (employee rolündeki kullanıcılar)
+  const activeEmployees = users.filter(user => user.role === 'employee').length;
   
   // Toplam müşteri sayısı
   const totalCustomers = customers.length;
@@ -56,7 +56,7 @@ export default function Dashboard() {
   ];
 
   // Yükleniyor durumu
-  const isLoading = employeesStatus === 'loading' || customersStatus === 'loading';
+  const isLoading = usersStatus === 'loading' || customersStatus === 'loading';
 
   return (
     <div className="min-h-screen bg-gradient-to-br flex items-center  from-pink-50 to-purple-50 p-4">

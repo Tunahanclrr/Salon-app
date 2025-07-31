@@ -4,7 +4,7 @@ import { FiPlus, FiSearch, FiEdit, FiDollarSign, FiPackage, FiCalendar, FiUser, 
 import { fetchPackageSales, addPackageSale, addInstallmentPayment } from '../redux/packageSalesSlice';
 import { fetchPackages } from '../redux/packagesSlice';
 import { fetchCustomers } from '../redux/customersSlice';
-import { fetchEmployees } from '../redux/employeesSlice';
+import { fetchUsers } from '../redux/usersSlice';
 import { fetchServices } from '../redux/servicesSlice';
 import Modal from '../components/Modal';
 import PackageSaleForm from '../components/PackageSaleForm';
@@ -16,7 +16,7 @@ export default function PackageSales() {
   const dispatch = useDispatch();
   const { items: packageSales, status, loading } = useSelector(state => state.packageSales);
   const { items: customers } = useSelector(state => state.customers);
-  const { items: employees } = useSelector(state => state.employees);
+  const { items: users } = useSelector(state => state.users);
   const { items: packages } = useSelector(state => state.packages);
   const { items: services } = useSelector(state => state.services);
   
@@ -30,7 +30,7 @@ export default function PackageSales() {
   useEffect(() => {
     dispatch(fetchPackageSales());
     dispatch(fetchCustomers());
-    dispatch(fetchEmployees());
+    dispatch(fetchUsers());
     dispatch(fetchServices());
     dispatch(fetchPackages());
   }, [dispatch]);
@@ -97,14 +97,14 @@ export default function PackageSales() {
     return customer ? customer.name : 'Bilinmeyen Müşteri';
   };
 
-  const getEmployeeName = (employeeId) => {
-    // Eğer employeeId bir obje ise (populate edilmiş)
-    if (typeof employeeId === 'object' && employeeId !== null) {
-      return employeeId.name || 'Bilinmeyen Çalışan';
+  const getUserName = (userId) => {
+    // Eğer userId bir obje ise (populate edilmiş)
+    if (typeof userId === 'object' && userId !== null) {
+      return userId.name || 'Bilinmeyen Kullanıcı';
     }
-    // Eğer employeeId bir string ise (id referansı)
-    const employee = employees.find(e => e._id === employeeId);
-    return employee ? employee.name : 'Bilinmeyen Çalışan';
+    // Eğer userId bir string ise (id referansı)
+    const user = users.find(u => u._id === userId);
+    return user ? user.name : 'Bilinmeyen Kullanıcı';
   };
 
   const getPackageName = (packageId) => {
@@ -261,7 +261,7 @@ export default function PackageSales() {
                             {getCustomerName(pkg.customer)}
                           </div>
                           <div className="text-sm text-gray-500">
-                            Satış: {getEmployeeName(pkg.seller)}
+                            Satış: {getUserName(pkg.seller)}
                           </div>
                           <div className="text-xs text-blue-500 mt-1">
                             Son Tahsilat: {pkg.payments && pkg.payments.length > 0 ? formatDate(pkg.payments[pkg.payments.length - 1].paymentDate) : 'Yok'}
@@ -357,7 +357,7 @@ export default function PackageSales() {
           onClose={() => setDetailsModalOpen(false)}
           formatCurrency={formatCurrency}
           getCustomerName={getCustomerName}
-          getEmployeeName={getEmployeeName}
+          getUserName={getUserName}
         />
       </Modal>
     </div>

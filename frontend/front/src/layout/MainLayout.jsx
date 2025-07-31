@@ -15,9 +15,9 @@ export default function MainLayout() {
           className="bg-white p-2 rounded-lg shadow-md hover:shadow-lg transition-shadow"
         >
           {sidebarOpen ? (
-            <FiX className="w-6 h-6 text-gray-600" />
+            React.createElement(FiX, { className: "w-6 h-6 text-gray-600" })
           ) : (
-            <FiMenu className="w-6 h-6 text-gray-600" />
+            React.createElement(FiMenu, { className: "w-6 h-6 text-gray-600" })
           )}
         </button>
       </div>

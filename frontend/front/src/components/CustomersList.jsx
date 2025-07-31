@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchCustomers, deleteCustomer, addCustomer } from '../redux/customersSlice';
 import Modal from './Modal';
 import CustomerForm from './CustomerForm';
+import * as XLSX from 'xlsx';
 
 export default function CustomersList() {
   const dispatch = useDispatch();
@@ -11,6 +12,9 @@ export default function CustomersList() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importData, setImportData] = useState([]);
+  const [importLoading, setImportLoading] = useState(false);
 
   useEffect(() => {
     dispatch(fetchCustomers());
@@ -54,6 +58,106 @@ export default function CustomersList() {
     setCustomerToDelete(null);
   };
 
+  // Excel dosyası okuma işlemi
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        // Excel verilerini uygun formata dönüştür
+        const formattedData = jsonData.map((row, index) => ({
+          id: index + 1,
+          name: row['Ad Soyad'] || row['Name'] || row['İsim'] || row['name'] || '',
+          phone: row['Telefon'] || row['Phone'] || row['phone'] || '',
+          email: row['E-posta'] || row['Email'] || row['email'] || '',
+          notes: row['Not'] || row['Notes'] || row['notes'] || ''
+        })).filter(customer => customer.name || customer.phone || customer.email);
+
+        setImportData(formattedData);
+        setImportModalOpen(true);
+      } catch (error) {
+        console.error('Excel dosyası okuma hatası:', error);
+        alert('Excel dosyası okunamadı. Lütfen geçerli bir Excel dosyası seçin.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    // Input'u temizle
+    event.target.value = '';
+  };
+
+  // Excel şablonu indirme işlemi
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        'Ad Soyad': 'Örnek Müşteri 1',
+        'Telefon': '05551234567',
+        'E-posta': 'ornek1@email.com',
+        'Not': 'Örnek not'
+      },
+      {
+        'Ad Soyad': 'Örnek Müşteri 2',
+        'Telefon': '05559876543',
+        'E-posta': 'ornek2@email.com',
+        'Not': ''
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Müşteriler');
+    
+    // Dosyayı indir
+    XLSX.writeFile(workbook, 'musteri-sablonu.xlsx');
+  };
+
+  // Toplu müşteri ekleme işlemi
+  const handleBulkImport = async () => {
+    if (importData.length === 0) return;
+
+    setImportLoading(true);
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const customer of importData) {
+        try {
+          await dispatch(addCustomer({
+            name: customer.name,
+            phone: customer.phone,
+            email: customer.email,
+            notes: customer.notes
+          }));
+          successCount++;
+        } catch (error) {
+          console.error('Müşteri eklenemedi:', customer, error);
+          errorCount++;
+        }
+      }
+
+      alert(`İçe aktarma tamamlandı!\nBaşarılı: ${successCount}\nHatalı: ${errorCount}`);
+      
+      if (successCount > 0) {
+        dispatch(fetchCustomers()); // Listeyi güncelle
+      }
+      
+      setImportModalOpen(false);
+      setImportData([]);
+    } catch (error) {
+      console.error('Toplu import hatası:', error);
+      alert('İçe aktarma sırasında bir hata oluştu.');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto px-2">
       <div className="flex flex-col items-center gap-4 mb-6">
@@ -71,6 +175,27 @@ export default function CustomersList() {
             onClick={() => setAddModalOpen(true)}
           >
              Müşteri Ekle
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileUpload}
+            className="hidden"
+            id="excel-upload"
+          />
+          <label
+            htmlFor="excel-upload"
+            className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded shadow cursor-pointer"
+          >
+            Excel'den İçe Aktar
+          </label>
+          <button
+            onClick={downloadTemplate}
+            className="bg-orange-600 hover:bg-orange-700 text-white text-sm px-4 py-2 rounded shadow"
+          >
+            Excel Şablonu İndir
           </button>
         </div>
       </div>
@@ -117,6 +242,77 @@ export default function CustomersList() {
           onSubmit={handleAddCustomer}
           onCancel={() => setAddModalOpen(false)}
         />
+      </Modal>
+
+      {/* Excel import modalı */}
+      <Modal 
+        open={importModalOpen} 
+        onClose={() => setImportModalOpen(false)} 
+        title="Excel'den Müşteri İçe Aktarma"
+      >
+        <div className="max-h-96 overflow-y-auto">
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 mb-2">
+              {importData.length} müşteri bulundu. İçe aktarmak istediğiniz müşterileri kontrol edin:
+            </p>
+            <div className="text-xs text-gray-500 mb-4">
+              <strong>Desteklenen sütun isimleri:</strong><br/>
+              • Ad Soyad / Name / İsim / name<br/>
+              • Telefon / Phone / phone<br/>
+              • E-posta / Email / email<br/>
+              • Not / Notes / notes
+            </div>
+          </div>
+          
+          {importData.length > 0 && (
+            <div className="border rounded-lg overflow-hidden mb-4">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Ad Soyad</th>
+                    <th className="px-3 py-2 text-left">Telefon</th>
+                    <th className="px-3 py-2 text-left">E-posta</th>
+                    <th className="px-3 py-2 text-left">Not</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importData.slice(0, 10).map((customer) => (
+                    <tr key={customer.id} className="border-t">
+                      <td className="px-3 py-2">{customer.name}</td>
+                      <td className="px-3 py-2">{customer.phone}</td>
+                      <td className="px-3 py-2">{customer.email}</td>
+                      <td className="px-3 py-2">{customer.notes}</td>
+                    </tr>
+                  ))}
+                  {importData.length > 10 && (
+                    <tr className="border-t bg-gray-50">
+                      <td colSpan="4" className="px-3 py-2 text-center text-gray-500">
+                        ... ve {importData.length - 10} müşteri daha
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex justify-end gap-2 mt-4">
+          <button
+            className="bg-gray-300 px-4 py-2 rounded"
+            onClick={() => setImportModalOpen(false)}
+            disabled={importLoading}
+          >
+            İptal
+          </button>
+          <button
+            className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400"
+            onClick={handleBulkImport}
+            disabled={importLoading || importData.length === 0}
+          >
+            {importLoading ? 'İçe Aktarılıyor...' : `${importData.length} Müşteriyi İçe Aktar`}
+          </button>
+        </div>
       </Modal>
       {/* Müşteri silme onay modalı */}
       <Modal

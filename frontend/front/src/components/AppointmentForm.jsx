@@ -22,17 +22,21 @@ function Modal({ open, onClose, children }) {
   );
 }
 
-export default function AppointmentForm({
-  employees,
-  customers,
-  appointments,
-  onCancel,
-  onSubmit,
-  onAddCustomer,
-  initialData = null,
-}) {
+const AppointmentForm = ({ 
+  users, 
+  customers, 
+  services: servicesFromProps, 
+  appointments, 
+  onSubmit, 
+  onCancel, 
+  onAddCustomer, 
+  initialData 
+}) => {
   const dispatch = useDispatch();
-  const { items: services, loading } = useSelector((state) => state.services);
+  const { items: servicesFromRedux, loading } = useSelector((state) => state.services);
+  
+  // Services'i Redux'tan veya props'tan al
+  const services = servicesFromRedux && servicesFromRedux.length > 0 ? servicesFromRedux : servicesFromProps || [];
 
   // Form state ve validasyon hataları
   const [form, setForm] = useState({
@@ -117,10 +121,15 @@ export default function AppointmentForm({
     price: svc.price ?? 0,
   }));
 
-  const employeeOptions = employees.map((emp) => ({
-    value: emp._id,
-    label: `${emp.name} - ${emp.role}`,
-  }));
+  const employeeOptions = users
+    .filter((user) => user.role === 'employee' || user.role === 'admin')
+    .map((emp) => ({
+      value: emp._id || emp.id,
+      label: `${emp.name || emp.username} - ${emp.job || emp.role}`,
+    }));
+
+  console.log('Users prop:', users);
+  console.log('Employee options:', employeeOptions);
 
   const customerOptions = customers.map((cust) => ({
     value: cust._id,
@@ -175,11 +184,8 @@ export default function AppointmentForm({
           appStart.getTime() + (app.duration || 30) * 60000
         );
 
-        return (
-          (slotStart >= appStart && slotStart < appEnd) ||
-          (slotEnd > appStart && slotEnd <= appEnd) ||
-          (slotStart <= appStart && slotEnd >= appEnd)
-        );
+        // Çakışma kontrolü: iki zaman aralığı çakışıyor mu?
+        return (slotStart < appEnd && slotEnd > appStart);
       });
     };
 
@@ -192,16 +198,18 @@ export default function AppointmentForm({
         .toString()
         .padStart(2, "0")}:${slotEnd.getMinutes().toString().padStart(2, "0")}`;
 
-      const isAvailable = isTimeSlotAvailable(time);
+        const isAvailable = isTimeSlotAvailable(time);
 
-      return {
-        value: time,
-        label: isAvailable
-          ? `${time} - ${endTimeStr} (${totalDuration} dk)`
-          : `${time} - dolu`,
-        isDisabled: false,
-        endTime: endTimeStr,
-      };
+        return {
+          value: time,
+          label: isAvailable
+            ? `${time} - ${endTimeStr} (${totalDuration} dk)`
+            : `${time} - dolu (seçilebilir)`,
+          // Artık hiçbir zaman dilimini devre dışı bırakmıyoruz. Kullanıcı çakışmalı
+          // bir saat seçerse form gönderiminde onay istenecek.
+          isDisabled: false,
+          endTime: endTimeStr,
+        };
     });
 
     return availableSlots;
@@ -524,4 +532,6 @@ export default function AppointmentForm({
       </Modal>
     </>
   );
-}
+};
+
+export default AppointmentForm;

@@ -1,12 +1,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { API_BASE_URL } from '../config/api';
+import api from '../config/api';
 
 // Paketleri çekme
 export const fetchPackages = createAsyncThunk(
   'packages/fetchPackages',
   async () => {
-    const response = await axios.get(`${API_BASE_URL}/api/packages`);
+    const response = await api.get('/api/packages');
     return response.data;
   }
 );
@@ -16,7 +15,7 @@ export const addPackage = createAsyncThunk(
   'packages/addPackage',
   async (packageData, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/packages`, packageData);
+      const response = await api.post('/api/packages', packageData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Paket eklenirken hata oluştu');
@@ -29,7 +28,7 @@ export const updatePackage = createAsyncThunk(
   'packages/updatePackage',
   async ({ id, updates }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(`${API_BASE_URL}/api/packages/${id}`, updates);
+      const response = await api.put(`/api/packages/${id}`, updates);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Paket güncellenirken hata oluştu');
@@ -42,7 +41,7 @@ export const deletePackage = createAsyncThunk(
   'packages/deletePackage',
   async (id, { rejectWithValue }) => {
     try {
-      const response = await axios.delete(`${API_BASE_URL}/api/packages/${id}`);
+      const response = await api.delete(`/api/packages/${id}`);
       return { id, ...response.data };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Paket silinirken hata oluştu');

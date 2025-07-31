@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { FiCalendar, FiPlus } from 'react-icons/fi';
-import { fetchEmployees } from '../redux/employeesSlice';
+import { fetchUsers } from '../redux/usersSlice';
 import { fetchCustomers, addCustomer } from '../redux/customersSlice';
 import { fetchServices } from '../redux/servicesSlice';
-import { addAppointment, updateAppointment, updateCustomerNotArrived } from '../redux/appointmentsSlice';
+import { fetchAppointments, addAppointment, updateAppointment, updateCustomerNotArrived } from '../redux/appointmentsSlice';
+import { selectCurrentUser, selectIsAdmin } from '../redux/authSlice';
 import Modal from '../components/Modal';
 import AppointmentForm from '../components/AppointmentForm';
 import AppointmentEditForm from '../components/AppointmenEditForm';
@@ -260,23 +261,67 @@ const Appointments = () => {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   const services = useSelector((state) => state.services.items);
-  const employees = useSelector((state) => state.employees.items);
+  const users = useSelector((state) => state.users.items);
   const customers = useSelector((state) => state.customers.items);
+  const appointments = useSelector((state) => state.appointments.items);
+  const currentUser = useSelector(selectCurrentUser);
+  const isAdmin = useSelector(selectIsAdmin);
 
   useEffect(() => {
-    dispatch(fetchEmployees());
+    dispatch(fetchUsers());
     dispatch(fetchCustomers());
     dispatch(fetchServices());
+    dispatch(fetchAppointments());
   }, [dispatch]);
 
+  // Kullanıcı rolüne göre randevuları filtrele
+  const filteredAppointments = useMemo(() => {
+    if (!currentUser) return [];
+    
+    if (isAdmin) {
+      // Admin tüm randevuları görebilir
+      return appointments;
+    } else {
+      // Normal kullanıcı sadece kendi randevularını görebilir
+      return appointments.filter(app => {
+        // Employee alanı hem obje hem de string olabilir
+        const employeeId = typeof app.employee === 'object' && app.employee !== null 
+          ? app.employee._id 
+          : app.employee;
+        
+        return employeeId === currentUser._id;
+      });
+    }
+  }, [appointments, currentUser, isAdmin]);
+
+  // Kullanıcı rolüne göre kullanıcıları filtrele
+  const filteredUsers = useMemo(() => {
+    if (!currentUser) return [];
+    
+    // Tüm kullanıcılar (admin ve employee) tüm çalışanları görebilir
+    // Sadece employee ve admin rolündeki kullanıcıları göster
+    return users.filter(user => user.role === 'employee' || user.role === 'admin');
+  }, [users, currentUser]);
+
   const allAppointments = useMemo(() => {
-    return employees.flatMap(emp =>
-      (emp.appointments || []).map(app => ({
+    return filteredAppointments.map(app => {
+      // Employee alanı hem obje hem de string olabilir
+      const employeeId = typeof app.employee === 'object' && app.employee !== null 
+        ? app.employee._id 
+        : app.employee;
+      
+      const employee = filteredUsers.find(user => user._id === employeeId);
+      return {
         ...app,
-        employee: { _id: emp._id, name: emp.name, role: emp.role, index: employees.findIndex(e => e._id === emp._id) },
-      }))
-    );
-  }, [employees]);
+        employee: employee ? {
+          _id: employee._id,
+          name: employee.name,
+          role: employee.job,
+          index: filteredUsers.findIndex(e => e._id === employee._id)
+        } : null,
+      };
+    });
+  }, [filteredAppointments, filteredUsers]);
 
   const appointmentsWithOverlapInfo = useMemo(() => {
     const processedAppointments = [];
@@ -375,7 +420,7 @@ const Appointments = () => {
     if (addAppointment.fulfilled.match(result)) {
       toast.success('Randevu başarıyla oluşturuldu');
       setAddModalOpen(false);
-      dispatch(fetchEmployees());
+      dispatch(fetchAppointments());
       dispatch(fetchCustomers());
     } else {
       toast.error(result.payload?.message || 'Randevu oluşturulamadı');
@@ -388,7 +433,7 @@ const Appointments = () => {
       toast.success('Randevu güncellendi');
       setEditModalOpen(false);
       setEditingAppointment(null);
-      dispatch(fetchEmployees());
+      dispatch(fetchAppointments());
       dispatch(fetchCustomers());
     } else {
       toast.error(result.payload?.message || 'Güncelleme başarısız');
@@ -401,7 +446,7 @@ const Appointments = () => {
 
     if (updateAppointment.fulfilled.match(result)) {
       toast.success('Randevu başarıyla güncellendi');
-      await dispatch(fetchEmployees());
+      await dispatch(fetchAppointments());
     } else {
       if (result.payload?.conflict && !force) {
         toast.error('Bu saat aralığında çalışanın başka bir randevusu var. Lütfen manuel deneyin.');
@@ -564,7 +609,7 @@ const Appointments = () => {
       
       if (updateCustomerNotArrived.fulfilled.match(result)) {
         toast.success(status ? 'Müşteri gelmedi olarak işaretlendi' : 'Müşteri geldi olarak işaretlendi');
-        dispatch(fetchEmployees());
+        dispatch(fetchAppointments());
         
         // Eğer modal açıksa, seçili randevuyu güncelle
         if (selectedAppointment && selectedAppointment._id === appointmentId) {
@@ -645,24 +690,24 @@ const Appointments = () => {
           <div 
             className="grid border-b border-gray-200 relative z-20 bg-gray-50 sticky top-0 left-0 calendar-header-grid"
             style={{
-              '--employee-count': employees.length,
-              'grid-template-columns': `60px repeat(${employees.length}, 1fr)`
+              '--employee-count': filteredUsers.length,
+              gridTemplateColumns: `60px repeat(${filteredUsers.length}, 1fr)`
             }}
           >
             <div className="py-2 px-1 sm:py-3 sm:px-2 border-r border-gray-200 font-semibold text-xs sm:text-sm text-gray-700 text-center time-column-sticky flex items-center justify-center">
               <span>Saat</span>
             </div>
-            {employees.map((emp, index) => {
+            {filteredUsers.map((user, index) => {
               const colors = ['bg-green-100', 'bg-orange-100', 'bg-blue-100', 'bg-pink-100', 'bg-purple-100', 'bg-yellow-100'];
               const borderColors = ['border-green-300', 'border-orange-300', 'border-blue-300', 'border-pink-300', 'border-purple-300', 'border-yellow-300'];
               const colorClass = colors[index % colors.length];
               const borderColorClass = borderColors[index % borderColors.length];
               return (
                 <div
-                  key={emp._id}
+                  key={user._id}
                   className={`py-2 px-1 sm:py-3 sm:px-2 text-xs sm:text-sm text-center font-semibold text-gray-800 ${colorClass} ${borderColorClass} border-r employee-header-cell`}
                 >
-                  <span className="truncate block">{emp.name}</span>
+                  <span className="truncate block">{user.name}</span>
                 </div>
               );
             })}
@@ -671,8 +716,8 @@ const Appointments = () => {
           <div 
             className="relative grid calendar-body-grid"
             style={{
-              '--employee-count': employees.length,
-              'grid-template-columns': `60px repeat(${employees.length}, 1fr)`
+              '--employee-count': filteredUsers.length,
+              gridTemplateColumns: `60px repeat(${filteredUsers.length}, 1fr)`
             }}
           >
             <div className="time-column-sticky bg-white" style={{ width: '60px' }}>
@@ -693,23 +738,32 @@ const Appointments = () => {
               ))}
             </div>
 
-            {employees.map(emp => (
+            {filteredUsers.map(user => (
               <div 
-                key={emp._id} 
+                key={user._id} 
                 className="relative border-r border-gray-100 bg-white employee-column"
               >
-                {timeSlots.map((time) => (
+                {/* Her saat dilimi için TimeSlot bileşeni */}
+                {timeSlots.map((slot) => (
                   <TimeSlot
-                    key={`${emp._id}-${selectedDate}-${time}`}
-                    time={time}
+                    key={`${user._id}-${slot}`}
+                    time={slot}
                     date={selectedDate}
-                    employee={emp}
+                    employee={user}
                     onDropAppointment={handleDropAppointment}
                     onDoubleClick={handleSlotDoubleClick}
                   />
                 ))}
+                
+                {/* Randevuları üstte göster */}
                 {appointmentsWithOverlapInfo
-                  .filter(app => app.employee?._id === emp._id && app.date === selectedDate)
+                  .filter(app => {
+                    // Sadece tarih kontrolü yap
+                    if (app.date !== selectedDate) return false;
+                    
+                    // Bu randevunun bu kullanıcıya ait olup olmadığını kontrol et
+                    return app.employee?._id === user._id;
+                  })
                   .map(app => (
                     <DraggableAppointment
                       key={app._id}
@@ -732,7 +786,7 @@ const Appointments = () => {
 
         <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title="Randevu Ekle">
           <AppointmentForm
-            employees={employees}
+            users={filteredUsers}
             customers={customers}
             services={services}
             appointments={allAppointments} 
@@ -749,7 +803,7 @@ const Appointments = () => {
         }} title="Randevu Düzenle">
           <AppointmentEditForm
             initialData={editingAppointment}
-            employees={employees}
+            users={filteredUsers}
             customers={customers}
             services={services}
             appointments={allAppointments} 

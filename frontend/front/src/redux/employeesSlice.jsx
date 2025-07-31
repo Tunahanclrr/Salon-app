@@ -1,13 +1,12 @@
 // src/redux/employeesSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { API_BASE_URL } from '../config/api';
+import api from '../config/api';
 
 // Çalışanları API'den çek
 export const fetchEmployees = createAsyncThunk(
   'employees/fetchEmployees',
   async () => {
-    const response = await axios.get(`${API_BASE_URL}/api/employees`);
+    const response = await api.get('/api/employees');
     return response.data;
   }
 );
@@ -16,16 +15,18 @@ export const fetchEmployees = createAsyncThunk(
 export const deleteEmployee = createAsyncThunk(
   'employees/deleteEmployee',
   async (id) => {
-    await axios.delete(`${API_BASE_URL}/api/employees/${id}`);
+    await api.delete(`/api/employees/${id}`);
     return id;
   }
 );
+
+// Çalışan ekleme
 export const addEmployee = createAsyncThunk(
   'employees/addEmployee',
-  async (employeeData, { rejectWithValue }) => {
+  async (employee, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/employees`, employeeData);
-      return response.data.data; // 
+      const response = await api.post('/api/employees', employee);
+      return response.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Çalışan eklenemedi');
     }
@@ -57,8 +58,8 @@ const employeesSlice = createSlice({
       // Çalışan silme
       .addCase(deleteEmployee.fulfilled, (state, action) => {
         state.items = state.items.filter(emp => emp._id !== action.payload);
-      });
-      builder
+      })
+      // Çalışan ekleme
       .addCase(addEmployee.fulfilled, (state, action) => {
         state.items.push(action.payload);
       });

@@ -12,7 +12,7 @@ export default function PackageSaleForm({ onSubmit, onCancel, loading }) {
   const { items: customers } = useSelector(state => state.customers);
   const { items: packages } = useSelector(state => state.packages);
   const { items: services } = useSelector(state => state.services);
-  const { items: employees } = useSelector(state => state.employees);
+  const { items: users } = useSelector(state => state.users);
 
   const [formData, setFormData] = useState({
     customerId: '',
@@ -56,9 +56,9 @@ export default function PackageSaleForm({ onSubmit, onCancel, loading }) {
     label: `${service.name} - ${service.price}₺`
   }));
 
-  const employeeOptions = employees.map(employee => ({
+  const employeeOptions = users.filter(user => user.role === 'employee' || user.role === 'admin').map(employee => ({
     value: employee._id,
-    label: employee.name
+    label: `${employee.name} - ${employee.job || employee.role}`
   }));
 
   // Calculate total amount

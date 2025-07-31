@@ -1,14 +1,13 @@
 // src/features/customers/customersSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { API_BASE_URL } from '../config/api';
+import api from '../config/api';
 
 // Müşterileri getirme thunk'ı
 export const fetchCustomers = createAsyncThunk(
   'customers/fetchCustomers',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/customers`);
+      const response = await api.get('/api/customers');
       return response.data;
     } catch (err) {
       const msg = err.response?.data?.message || 'Sunucu hatası';
@@ -17,15 +16,47 @@ export const fetchCustomers = createAsyncThunk(
   }
 );
 
-export const deleteCustomer = createAsyncThunk('customers/deleteCustomer', async (id) => {
-  await axios.delete(`${API_BASE_URL}/api/customers/${id}`);
-  return id;
-});
+// Müşteri ekleme thunk'ı
+export const addCustomer = createAsyncThunk(
+  'customers/addCustomer',
+  async (customerData, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/api/customers', customerData);
+      return response.data;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Müşteri eklenirken hata oluştu';
+      return rejectWithValue(msg);
+    }
+  }
+);
 
-export const addCustomer = createAsyncThunk('customers/addCustomer', async (customer) => {
-  const response = await axios.post(`${API_BASE_URL}/api/customers`, customer);
-  return response.data;
-});
+// Müşteri güncelleme thunk'ı
+export const updateCustomer = createAsyncThunk(
+  'customers/updateCustomer',
+  async ({ id, customerData }, { rejectWithValue }) => {
+    try {
+      const response = await api.put(`/api/customers/${id}`, customerData);
+      return response.data;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Müşteri güncellenirken hata oluştu';
+      return rejectWithValue(msg);
+    }
+  }
+);
+
+// Müşteri silme thunk'ı
+export const deleteCustomer = createAsyncThunk(
+  'customers/deleteCustomer',
+  async (id, { rejectWithValue }) => {
+    try {
+      await api.delete(`/api/customers/${id}`);
+      return id;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Müşteri silinirken hata oluştu';
+      return rejectWithValue(msg);
+    }
+  }
+);
 
 const customersSlice = createSlice({
   name: 'customers',

@@ -1,7 +1,7 @@
 // src/pages/Services.jsx
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchServices, addService, deleteService, editService } from '../redux/servicesSlice'; // addService, deleteService ve editService import edildi
+import { fetchServices, addService, deleteService, updateService } from '../redux/servicesSlice'; // editService yerine updateService import edildi
 import Modal from '../components/Modal'; // Modal bileşeni import edildi
 import ServiceForm from '../components/ServiceForm'; // ServiceForm bileşeni import edildi
 import { FiPlus } from 'react-icons/fi'; // Ekle butonu için ikon
@@ -12,7 +12,6 @@ export default function Services() {
   const services = useSelector((state) => state.services.items);
   const loading = useSelector((state) => state.services.loading);
   const error = useSelector((state) => state.services.error);
-
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingService, setEditingService] = useState(null);
@@ -55,13 +54,18 @@ export default function Services() {
 
   const handleEditService = async (id, data) => {
     try {
-      const resultAction = await dispatch(editService({ id, data }));
-      if (editService.fulfilled.match(resultAction)) {
+      console.log('🔧 handleEditService called with:', { id, data });
+      console.log('Data keys:', Object.keys(data));
+      console.log('Data values:', Object.values(data));
+      
+      const resultAction = await dispatch(updateService({ id, data }));
+      if (updateService.fulfilled.match(resultAction)) {
         toast.success('Hizmet başarıyla düzenlendi!');
         setIsEditModalOpen(false);
         setEditingService(null);
         await dispatch(fetchServices());
       } else {
+        console.log('❌ updateService failed:', resultAction);
         throw new Error(resultAction.payload || 'Hizmet düzenlenirken bir hata oluştu.');
       }
     } catch (error) {

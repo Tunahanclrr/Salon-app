@@ -14,11 +14,13 @@ export default function ServiceForm({ onSubmit = () => {}, onCancel, initialData
       newErrors.name = 'Hizmet adı boş bırakılamaz.';
     }
     // Süre kontrolü: boş olmamalı, sayı olmalı ve 0'dan büyük olmalı
-    if (!duration || isNaN(duration) || Number(duration) <= 0) {
+    const durationValue = String(duration).trim();
+    if (!durationValue || isNaN(durationValue) || Number(durationValue) <= 0) {
       newErrors.duration = 'Geçerli bir süre (dakika) girilmelidir.';
     }
     // Fiyat kontrolü: boş olmamalı, sayı olmalı ve 0 veya daha büyük olmalı
-    if (!price || isNaN(price) || Number(price) < 0) {
+    const priceValue = String(price).trim();
+    if (!priceValue || isNaN(priceValue) || Number(priceValue) < 0) {
       newErrors.price = 'Geçerli bir fiyat girilmelidir.';
     }
     setErrors(newErrors);
@@ -27,11 +29,22 @@ export default function ServiceForm({ onSubmit = () => {}, onCancel, initialData
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    console.log('🔧 ServiceForm handleSubmit called');
+    console.log('Raw values:', { name, duration, price });
+    console.log('Name length:', name.length, 'Trimmed length:', name.trim().length);
+    
     if (validate()) {
-      console.log('Form submitted with data:', { name, duration: Number(duration), price: Number(price) });
+      const submitData = { 
+        name: name.trim(), 
+        duration: Number(duration), 
+        price: Number(price) 
+      };
+      console.log('✅ Form validation passed, submitting data:', submitData);
       // onSubmit prop'u Services.jsx'ten gelen handleAddService fonksiyonudur
-      onSubmit({ name, duration: Number(duration), price: Number(price) });
+      onSubmit(submitData);
     } else {
+      console.log('❌ Form validation failed');
       toast.error('Lütfen tüm alanları doğru doldurunuz.');
     }
   };
