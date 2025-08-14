@@ -3,18 +3,42 @@ const Appointment = require('../models/Appointmen');
 const User = require('../models/User');
 const Customer = require('../models/Customer');
 const Service = require('../models/Services');
+const CustomerPackage = require('../models/CustomerPackage');
 
 // Randevu oluştur
 exports.createAppointment = async (req, res) => {
   try {
-    const { employee, customer, customerId, date, time, services = [], notes, duration, force = false } = req.body;
+    const { employee, customer, customerId, date, time, services = [], notes, duration, force = false, customerPackage } = req.body;
     const customerFinal = customer || customerId;
 
-    // Gerekli alan kontrolü
-    if (!employee || !customerFinal || !date || !time || !services.length) {
+    // Admin değilse, her zaman giriş yapan kullanıcının id'sini kullan
+    const isAdmin = req.user?.role === 'admin';
+    const employeeFinal = isAdmin ? employee : req.user._id;
+
+    // Gerekli alan kontrolü (admin değilse employee body’den zorunlu değil)
+    if (!employeeFinal || !customerFinal || !date || !time || !services.length) {
       return res.status(400).json({
         message: 'Zorunlu alanlar: çalışan, müşteri, tarih, saat ve en az bir hizmet.'
       });
+    }
+
+    // Müşteri paketi kontrolü ve seans kullanma
+    if (customerPackage) {
+      const customerPackageDoc = await CustomerPackage.findById(customerPackage._id);
+      if (!customerPackageDoc) {
+        return res.status(400).json({ message: 'Müşteri paketi bulunamadı.' });
+      }
+
+      const sessionCount = customerPackage.sessionCount || 1;
+
+      if (!customerPackageDoc.canUseSession(sessionCount)) {
+        return res.status(400).json({ 
+          message: `Bu paketin yeterli seansı yok. Kalan seans: ${customerPackageDoc.remainingQuantity}, İstenen: ${sessionCount}` 
+        });
+      }
+
+      // Seans kullan
+      await customerPackageDoc.useSession(sessionCount);
     }
 
     // Müşteri kontrolü
@@ -31,7 +55,9 @@ exports.createAppointment = async (req, res) => {
       return res.status(400).json({ message: 'Bazı hizmetler bulunamadı.' });
     }
 
-    const totalDuration = duration || foundServices.reduce((sum, svc) => sum + (svc.duration || 30), 0);
+    const baseDuration = foundServices.reduce((sum, svc) => sum + (svc.duration || 30), 0);
+    const sessionMultiplier = customerPackage?.sessionCount || 1;
+    const totalDuration = duration || (baseDuration * sessionMultiplier);
     const finalServices = foundServices.map(svc => ({
       name: svc.name,
       duration: svc.duration,
@@ -44,7 +70,7 @@ exports.createAppointment = async (req, res) => {
 
     // Çakışma kontrolü
     const existingAppointments = await Appointment.find({
-      employee,
+      employee: employeeFinal,
       date,
       status: { $ne: 'cancelled' }
     });
@@ -65,20 +91,22 @@ exports.createAppointment = async (req, res) => {
 
     // Çakışma olsa bile force varsa devam et
     const newAppointment = new Appointment({
-      employee,
+      employee: employeeFinal,
       customer: customerFinal,
       date,
       time,
       services: finalServices,
       duration: totalDuration,
       notes,
-      status: 'pending'
+      status: 'pending',
+      customerPackage: customerPackage?._id || null,
+      packageSessionCount: customerPackage?.sessionCount || 1
     });
 
     await newAppointment.save();
 
     // Kullanıcı ve müşteri güncellemesi
-    await User.findByIdAndUpdate(employee, {
+    await User.findByIdAndUpdate(employeeFinal, {
       $push: { appointments: newAppointment._id }
     });
     await Customer.findByIdAndUpdate(customerFinal, {
@@ -116,10 +144,15 @@ exports.getAllAppointments = async (req, res) => {
     const isAdmin = req.user?.role === 'admin';
     let query = {};
     
-    // Artık tüm kullanıcılar (admin ve personel) tüm randevuları görebilir
-    console.log('👑 User can see all appointments - Role:', req.user?.role);
+    // Admin tüm randevuları görebilir, personel sadece kendi randevularını görebilir
+    if (!isAdmin) {
+      query = { employee: req.user._id };
+      console.log('👤 Employee can only see their own appointments - User ID:', req.user._id);
+    } else {
+      console.log('👑 Admin can see all appointments - Role:', req.user?.role);
+    }
 
-    // Önce tüm randevuları kontrol et
+    // Önce tüm randevuları kontrol et (debugging için)
     const allAppointments = await Appointment.find({})
       .populate('customer', 'name email phone')
       .populate('employee', 'name job')
@@ -147,7 +180,7 @@ exports.getAllAppointments = async (req, res) => {
       id: app._id,
       date: app.date,
       time: app.time,
-      employeeId: app.employee,
+      employeeId: app.employee?._id || app.employee,
       employee: app.employee?.name,
       customer: app.customer?.name,
       services: app.services?.length || 0
@@ -257,7 +290,6 @@ exports.createTestAppointments = async (req, res) => {
     // Test müşterileri bul veya oluştur
     let testCustomers = await Customer.find({}).limit(3);
     if (testCustomers.length === 0) {
-      // Test müşterileri oluştur
       const customerData = [
         { name: 'Test Müşteri 1', phone: '555-0001', email: 'test1@example.com' },
         { name: 'Test Müşteri 2', phone: '555-0002', email: 'test2@example.com' },
@@ -375,7 +407,7 @@ exports.createTestAppointments = async (req, res) => {
 exports.updateAppointment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { employee, customer, date, time, services = [], notes, duration, force = false } = req.body;
+    const { employee, customer, date, time, services = [], notes, duration, force = false, customerPackage, packageSessionCount } = req.body;
 
     console.log('🔄 UPDATE APPOINTMENT REQUEST:');
     console.log('📋 ID:', id);
@@ -387,11 +419,15 @@ exports.updateAppointment = async (req, res) => {
     console.log('📋 Services:', services);
     console.log('📋 Duration:', duration);
     console.log('📋 Force:', force);
+    console.log('📋 Customer Package:', customerPackage);
+    console.log('📋 Package Session Count:', packageSessionCount);
 
-    if (!employee || !customer || !date || !time || !services.length) {
-      console.log('❌ Missing required fields');
+    // ESKİ: if (!employee || !customer || !date || !time || !services.length) {
+    // YENİ: services boş olabilir; mevcut hizmetler kullanılacak branch var
+    if (!employee || !customer || !date || !time) {
+      console.log('❌ Missing required fields (services boş olabilir)');
       return res.status(400).json({
-        message: 'Zorunlu alanlar: çalışan, müşteri, tarih, saat ve en az bir hizmet.'
+        message: 'Zorunlu alanlar: çalışan, müşteri, tarih ve saat.'
       });
     }
 
@@ -402,6 +438,106 @@ exports.updateAppointment = async (req, res) => {
       return res.status(404).json({ message: 'Randevu bulunamadı.' });
     }
 
+    // Müşteri paketi kontrolü ve seans güncelleme
+    if (customerPackage && packageSessionCount) {
+      console.log('🔄 Package session update started');
+      console.log('📦 Current appointment package:', appointment.customerPackage);
+      console.log('📦 New package ID:', customerPackage._id);
+      console.log('📦 Current session count:', appointment.packageSessionCount);
+      console.log('📦 New session count:', packageSessionCount);
+
+      // Eğer paket değişmediyse ve sadece seans sayısı değiştiyse
+      if (appointment.customerPackage && 
+          appointment.customerPackage.toString() === customerPackage._id.toString() && 
+          appointment.packageSessionCount !== packageSessionCount) {
+        
+        console.log('📦 Same package, updating session count only');
+        const customerPackageDoc = await CustomerPackage.findById(customerPackage._id);
+        if (!customerPackageDoc) {
+          console.log('❌ Customer package not found');
+          return res.status(400).json({ message: 'Müşteri paketi bulunamadı.' });
+        }
+
+        console.log('📦 Package before update:', {
+          totalQuantity: customerPackageDoc.totalQuantity,
+          usedQuantity: customerPackageDoc.usedQuantity,
+          remainingQuantity: customerPackageDoc.remainingQuantity,
+          status: customerPackageDoc.status
+        });
+
+        // Eski seans sayısını geri ekle
+        await customerPackageDoc.addSession(appointment.packageSessionCount);
+        console.log('📦 After adding back old sessions:', {
+          usedQuantity: customerPackageDoc.usedQuantity,
+          remainingQuantity: customerPackageDoc.remainingQuantity
+        });
+        
+        // Yeni seans sayısını kullanabilir mi kontrol et
+        if (!customerPackageDoc.canUseSession(packageSessionCount)) {
+          console.log('❌ Cannot use requested sessions');
+          return res.status(400).json({ 
+            message: `Bu paketin yeterli seansı yok. Kalan seans: ${customerPackageDoc.remainingQuantity}, İstenen: ${packageSessionCount}` 
+          });
+        }
+        
+        // Yeni seans sayısını kullan
+        await customerPackageDoc.useSession(packageSessionCount);
+        console.log('📦 After using new sessions:', {
+          usedQuantity: customerPackageDoc.usedQuantity,
+          remainingQuantity: customerPackageDoc.remainingQuantity
+        });
+        
+        // Randevu paket bilgilerini güncelle
+        appointment.packageSessionCount = packageSessionCount;
+        console.log('✅ Package session count updated successfully');
+      }
+      // Eğer yeni bir paket seçildiyse
+      else if (!appointment.customerPackage || 
+               appointment.customerPackage.toString() !== customerPackage._id.toString()) {
+        
+        console.log('📦 Different package selected, switching packages');
+        
+        // Eski paketi kontrol et ve seansları geri ekle
+        if (appointment.customerPackage) {
+          const oldPackage = await CustomerPackage.findById(appointment.customerPackage);
+          if (oldPackage) {
+            await oldPackage.addSession(appointment.packageSessionCount || 1);
+            console.log('📦 Returned sessions to old package');
+          }
+        }
+        
+        // Yeni paketi kontrol et
+        const newPackage = await CustomerPackage.findById(customerPackage._id);
+        if (!newPackage) {
+          console.log('❌ New package not found');
+          return res.status(400).json({ message: 'Müşteri paketi bulunamadı.' });
+        }
+        
+        console.log('📦 New package before use:', {
+          totalQuantity: newPackage.totalQuantity,
+          usedQuantity: newPackage.usedQuantity,
+          remainingQuantity: newPackage.remainingQuantity,
+          status: newPackage.status
+        });
+        
+        // Yeni paketten seans kullanabilir mi kontrol et
+        if (!newPackage.canUseSession(packageSessionCount)) {
+          console.log('❌ Cannot use sessions from new package');
+          return res.status(400).json({ 
+            message: `Bu paketin yeterli seansı yok. Kalan seans: ${newPackage.remainingQuantity}, İstenen: ${packageSessionCount}` 
+          });
+        }
+        
+        // Yeni paketten seans kullan
+        await newPackage.useSession(packageSessionCount);
+        console.log('📦 Used sessions from new package');
+        
+        // Randevu paket bilgilerini güncelle
+        appointment.customerPackage = customerPackage._id;
+        appointment.packageSessionCount = packageSessionCount;
+        console.log('✅ Package switched successfully');
+      }
+    }
     console.log('📋 Found appointment:', {
       id: appointment._id,
       currentEmployee: appointment.employee,
@@ -424,18 +560,95 @@ exports.updateAppointment = async (req, res) => {
     console.log('📋 Extracted service IDs:', serviceIds);
 
     if (serviceIds.length === 0) {
-      console.log('❌ No valid service IDs found');
-      return res.status(400).json({ message: 'Geçerli hizmet ID\'si bulunamadı.' });
+      const oldEmployeeId = appointment.employee?.toString();
+    
+      let computedDuration = duration;
+      if (!computedDuration && Array.isArray(appointment.services) && appointment.services.length > 0) {
+        computedDuration = appointment.services.reduce((sum, svc) => sum + (svc.duration || 30), 0);
+      }
+    
+      // Eğer mevcut randevuda da hizmet yoksa, hizmet güncellemesine dokunmadan diğer alanları kaydedelim
+      appointment.employee = employee;
+      appointment.customer = customer;
+      appointment.date = date;
+      appointment.time = time;
+      appointment.notes = notes;
+      if (computedDuration) {
+        appointment.duration = computedDuration;
+      } else if (duration) {
+        appointment.duration = duration;
+      }
+    
+      await appointment.save();
+    
+      if (oldEmployeeId && oldEmployeeId !== String(employee)) {
+        await User.findByIdAndUpdate(oldEmployeeId, { $pull: { appointments: appointment._id } });
+        await User.findByIdAndUpdate(employee, { $addToSet: { appointments: appointment._id } });
+      }
+    
+      await Customer.findByIdAndUpdate(customer, { $addToSet: { appointments: appointment._id } });
+    
+      const populated = await Appointment.findById(appointment._id)
+        .populate('customer', 'name email phone')
+        .populate('employee', 'name job');
+    
+      return res.status(200).json({
+        message: 'Randevu başarıyla güncellendi.',
+        data: populated
+      });
     }
 
+    // Mevcut kod devam ediyor...
     const foundServices = await Service.find({ _id: { $in: serviceIds } });
     console.log('📋 Found services from DB:', foundServices.map(s => ({ id: s._id, name: s.name, duration: s.duration })));
 
     if (foundServices.length !== serviceIds.length) {
-      console.log('❌ Some services not found in DB');
-      return res.status(400).json({ message: 'Bazı hizmetler bulunamadı.' });
+      // Bazı hizmetler bulunamadı -> mevcut randevudaki hizmetleri koru
+      if (appointment.services && appointment.services.length > 0) {
+        // 1) Eski çalışan ID'sini set etmeden önce al
+        const oldEmployeeId = appointment.employee?.toString();
+    
+        // 2) Duration sağlanmadıysa mevcut servislerden hesapla
+        let computedDuration = duration;
+        if (!computedDuration && Array.isArray(appointment.services) && appointment.services.length > 0) {
+          const baseDuration = appointment.services.reduce((sum, svc) => sum + (svc.duration || 30), 0);
+          const sessionMultiplier = packageSessionCount || appointment.packageSessionCount || 1;
+          computedDuration = baseDuration * sessionMultiplier;
+        }
+    
+        appointment.employee = employee;
+        appointment.customer = customer;
+        appointment.date = date;
+        appointment.time = time;
+        appointment.notes = notes;
+        appointment.duration = computedDuration || appointment.duration;
+
+        await appointment.save();
+
+        // 3) Çalışan ilişkilerini güncelle
+        if (oldEmployeeId && oldEmployeeId !== String(employee)) {
+          await User.findByIdAndUpdate(oldEmployeeId, { $pull: { appointments: appointment._id } });
+          await User.findByIdAndUpdate(employee, { $addToSet: { appointments: appointment._id } });
+        }
+
+        // 4) Müşteri ilişkisini güncelle
+        await Customer.findByIdAndUpdate(customer, { $addToSet: { appointments: appointment._id } });
+
+        const populated = await Appointment.findById(appointment._id)
+          .populate('customer', 'name email phone')
+          .populate('employee', 'name job');
+
+        return res.status(200).json({
+          message: 'Randevu başarıyla güncellendi (mevcut hizmetler kullanıldı).',
+          data: populated
+        });
+      } else {
+        console.log('❌ Some services not found in DB and no existing services');
+        return res.status(400).json({ message: 'Bazı hizmetler bulunamadı.' });
+      }
     }
 
+    // Mevcut kod devam ediyor...
     const totalDuration = duration || foundServices.reduce((sum, svc) => sum + (svc.duration || 30), 0);
     const finalServices = foundServices.map(svc => ({
       name: svc.name,
@@ -471,15 +684,8 @@ exports.updateAppointment = async (req, res) => {
       });
     }
 
-    const oldEmployeeId = appointment.employee.toString();
-
-    console.log('📋 Updating appointment with:');
-    console.log('  - Employee:', employee);
-    console.log('  - Customer:', customer);
-    console.log('  - Date:', date);
-    console.log('  - Time:', time);
-    console.log('  - Services:', finalServices);
-    console.log('  - Duration:', totalDuration);
+    // Eski çalışanın ID'sini, güncellemeden ÖNCE al
+    const oldEmployeeId = appointment.employee?.toString();
 
     // Randevuyu güncelle
     appointment.employee = employee;
@@ -492,38 +698,20 @@ exports.updateAppointment = async (req, res) => {
 
     await appointment.save();
 
-    console.log('✅ Appointment updated successfully');
-
-    // Eğer çalışan değiştiyse eski çalışandan çıkar, yeni çalışana ekle
-    if (oldEmployeeId !== employee) {
-      await User.findByIdAndUpdate(oldEmployeeId, {
-        $pull: { appointments: appointment._id }
-      });
-      await User.findByIdAndUpdate(employee, {
-        $addToSet: { appointments: appointment._id }
-      });
-      console.log('🔄 Employee relationships updated');
+    // Çalışan ilişkilerini güncelle
+    if (oldEmployeeId && oldEmployeeId !== String(employee)) {
+      await User.findByIdAndUpdate(oldEmployeeId, { $pull: { appointments: appointment._id } });
+      await User.findByIdAndUpdate(employee, { $addToSet: { appointments: appointment._id } });
     }
 
-    // Müşteri ilişkisini de güncelle
-    await Customer.findByIdAndUpdate(customer, {
-      $addToSet: { appointments: appointment._id }
-    });
+    // Müşteri ilişkisini güncelle
+    await Customer.findByIdAndUpdate(customer, { $addToSet: { appointments: appointment._id } });
 
     const populated = await Appointment.findById(appointment._id)
       .populate('customer', 'name email phone')
       .populate('employee', 'name job');
 
-    console.log('📋 Final updated appointment:', {
-      id: populated._id,
-      employee: populated.employee?.name,
-      date: populated.date,
-      time: populated.time,
-      services: populated.services,
-      duration: populated.duration
-    });
-
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Randevu başarıyla güncellendi.',
       data: populated
     });

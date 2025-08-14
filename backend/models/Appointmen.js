@@ -55,6 +55,15 @@ const appointmentSchema = new mongoose.Schema({
   customerNotArrived: {
     type: Boolean,
     default: false
+  },
+  customerPackage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CustomerPackage'
+  },
+  packageSessionCount: {
+    type: Number,
+    default: 1,
+    min: 1
   }
 }, { 
   timestamps: true,

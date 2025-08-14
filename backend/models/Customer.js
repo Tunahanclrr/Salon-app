@@ -9,7 +9,7 @@ const customerSchema = new mongoose.Schema({
   phone: {
     type: String,
     required: true,
-    unique: true, //benzersiz baska telefon no girilmez
+    unique: true,
     trim: true
   },
   email: {
@@ -30,6 +30,10 @@ const customerSchema = new mongoose.Schema({
   packageSales: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'PackageSale'
+  }],
+  customerPackages: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CustomerPackage'
   }]
 }, { timestamps: true });
 

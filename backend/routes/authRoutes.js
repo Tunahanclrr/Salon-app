@@ -7,7 +7,8 @@ const {
     updatePermissions,
     getAllUsers,
     toggleUserStatus,
-    changePassword
+    changePassword,
+    deleteUser
 } = require('../controllers/authController');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
@@ -21,5 +22,6 @@ router.post('/register', authenticateToken, requireAdmin, register);
 router.get('/users', authenticateToken, getAllUsers); // requireAdmin kaldırıldı
 router.put('/users/:userId/permissions', authenticateToken, requireAdmin, updatePermissions);
 router.patch('/users/:userId/toggle-status', authenticateToken, requireAdmin, toggleUserStatus);
+router.delete('/users/:userId', authenticateToken, requireAdmin, deleteUser);
 
 module.exports = router;

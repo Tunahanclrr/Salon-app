@@ -1,37 +1,26 @@
 const mongoose = require('mongoose');
 
 const packageSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, 'Paket adı zorunludur.'],
-    unique: true,
-    trim: true,
+  quantity: {
+    type: Number,
+    required: [true, 'Miktar zorunludur.'],
+    min: [1, 'Miktar en az 1 olmalıdır.']
   },
-  description: {
+  type: {
     type: String,
-    trim: true,
+    required: [true, 'Tip zorunludur.'],
+    enum: ['dakika', 'seans'],
+    default: 'seans'
   },
-  services: [{
-    service: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Service',
-      required: true
-    },
-    quantity: {
-      type: Number,
-      required: true,
-      min: 1
-    }
-  }],
+  service: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Service',
+    required: [true, 'Hizmet seçimi zorunludur.']
+  },
   price: {
     type: Number,
     required: [true, 'Fiyat zorunludur.'],
-    min: [0, 'Fiyat 0 veya daha büyük olmalıdır.'],
-  },
-  validityPeriod: {
-    type: Number,
-    default: 365,
-    min: 1
+    min: [0, 'Fiyat 0 veya daha büyük olmalıdır.']
   },
   isActive: {
     type: Boolean,

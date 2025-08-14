@@ -1,5 +1,6 @@
 const Customer = require('../models/Customer');
 const Appointment = require('../models/Appointmen');
+const CustomerPackage = require('../models/CustomerPackage');
 
 // ✅ Yeni müşteri ekleme
 exports.createCustomer = async (req, res) => {
@@ -44,24 +45,23 @@ exports.getAllCustomers = async (req, res) => {
   }
 };
 
-
 // ✅ Müşteri silme (ID ile)
 exports.deleteCustomer = async (req, res) => {
-    try {
-      const { id } = req.params;
-  
-      const deleted = await Customer.findByIdAndDelete(id);
-  
-      if (!deleted) {
-        return res.status(404).json({ message: 'Müşteri bulunamadı.' });
-      }
-  
-      res.status(200).json({ message: 'Müşteri başarıyla silindi.' });
-    } catch (error) {
-      console.error('deleteCustomer error:', error);
-      res.status(500).json({ message: 'Sunucu hatası.' });
+  try {
+    const { id } = req.params;
+
+    const deleted = await Customer.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return res.status(404).json({ message: 'Müşteri bulunamadı.' });
     }
-  };
+
+    res.status(200).json({ message: 'Müşteri başarıyla silindi.' });
+  } catch (error) {
+    console.error('deleteCustomer error:', error);
+    res.status(500).json({ message: 'Sunucu hatası.' });
+  }
+};
 
 // Bir müşterinin randevularını döner
 exports.getCustomerAppointments = async (req, res) => {
@@ -80,4 +80,68 @@ exports.getCustomerAppointments = async (req, res) => {
     res.status(500).json({ message: 'Sunucu hatası.' });
   }
 };
-  
+
+// Müşteri detaylarını getir (paketler ve randevular dahil)
+// In customerController.js, update the getCustomerDetails function
+exports.getCustomerDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await Customer.findById(id)
+      .populate({
+        path: 'packageSales',
+        populate: {
+          path: 'services.service',
+          model: 'Service'
+        }
+      })
+      .populate({
+        path: 'appointments',
+        populate: {
+          path: 'employee',
+          select: 'name'
+        }
+      })
+      .populate({
+        path: 'customerPackages',
+        populate: [{
+          path: 'package',
+          populate: {
+            path: 'service',
+            model: 'Service'
+          }
+        }, {
+          path: 'packageSale'
+        }]
+      });
+
+    if (!customer) {
+      return res.status(404).json({ message: 'Müşteri bulunamadı.' });
+    }
+
+    // Müşterinin aktif paketlerini getir
+    const customerPackages = await CustomerPackage.find({
+      customer: id
+    })
+      .populate('package')
+      .populate({
+        path: 'package',
+        populate: {
+          path: 'service',
+          model: 'Service'
+        }
+      })
+      .populate('packageSale')
+      .sort({ createdAt: -1 });
+
+    // Müşteri bilgilerini ve paketleri döndür
+    res.status(200).json({
+      customer,
+      packages: customerPackages
+    });
+
+  } catch (error) {
+    console.error('getCustomerDetails error:', error);
+    res.status(500).json({ message: 'Sunucu hatası.' });
+  }
+};

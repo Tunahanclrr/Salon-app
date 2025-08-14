@@ -41,6 +41,10 @@ app.use('/api', packageSaleRoutes);
 const packageRoutes = require('./routes/packageRoutes');
 app.use('/api/packages', packageRoutes);
 
+// Müşteri paket routes
+const customerPackageRoutes = require('./routes/customerPackageRoutes');
+app.use('/api/customer-packages', customerPackageRoutes);
+
 // Uygulamanın belirtilen port numarasında çalışmaya başlamasını sağlar. Sunucu başlatıldığında bir konsol mesajı verir.
 app.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`); // Sunucunun hangi portta çalıştığını konsola yazar.

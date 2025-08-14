@@ -11,5 +11,6 @@ router.post('/customers', authenticateToken, requirePermission('canEditCustomers
 router.delete('/customers/:id', authenticateToken, requirePermission('canEditCustomers'), customerController.deleteCustomer);
 // Bir müşterinin randevularını getir
 router.get('/customers/:id/appointments', authenticateToken, requirePermission('canViewCustomers'), customerController.getCustomerAppointments);
+router.get('/:id/details', customerController.getCustomerDetails);
 
 module.exports = router;

@@ -11,6 +11,15 @@ const packageSaleSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  package: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Package',
+    required: true
+  },
+  packageName: {
+    type: String,
+    required: true
+  },
   services: [{
     service: {
       type: mongoose.Schema.Types.ObjectId,

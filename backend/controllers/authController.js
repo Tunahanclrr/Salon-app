@@ -401,6 +401,50 @@ const changePassword = async (req, res) => {
     }
 };
 
+// Kullanıcı silme (sadece admin)  
+const deleteUser = async (req, res) => {  
+    try {  
+        const { userId } = req.params;  
+          
+        // ObjectId validation  
+        if (!mongoose.Types.ObjectId.isValid(userId)) {  
+            return res.status(400).json({  
+                success: false,  
+                message: 'Geçersiz kullanıcı ID formatı'  
+            });  
+        }  
+          
+        const user = await User.findById(userId);  
+        if (!user) {  
+            return res.status(404).json({  
+                success: false,  
+                message: 'Kullanıcı bulunamadı'  
+            });  
+        }  
+  
+        if (user.role === 'admin') {  
+            return res.status(400).json({  
+                success: false,  
+                message: 'Admin kullanıcı silinemez'  
+            });  
+        }  
+  
+        // Kullanıcıyı sil  
+        await User.findByIdAndDelete(userId);  
+  
+        res.json({  
+            success: true,  
+            message: 'Kullanıcı başarıyla silindi'  
+        });  
+    } catch (error) {  
+        res.status(500).json({  
+            success: false,  
+            message: 'Kullanıcı silinirken hata oluştu',  
+            error: error.message  
+        });  
+    }  
+};
+
 module.exports = {
     register,
     login,
@@ -408,5 +452,6 @@ module.exports = {
     updatePermissions,
     getAllUsers,
     toggleUserStatus,
-    changePassword
+    changePassword,
+    deleteUser
 };
