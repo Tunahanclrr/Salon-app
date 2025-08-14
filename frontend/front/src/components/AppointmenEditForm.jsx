@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Select from 'react-select';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchCustomerPackages } from "../redux/customerPackagesSlice";
 
 const AppointmentEditForm = ({ 
   initialData, 
@@ -11,6 +13,9 @@ const AppointmentEditForm = ({
   onCancel, 
   onAddCustomer 
 }) => {
+  const dispatch = useDispatch();
+  const { items: customerPackages } = useSelector((state) => state.customerPackages);
+  
   const [form, setForm] = useState({
     customerId: '',
     employeeId: '',
@@ -18,6 +23,9 @@ const AppointmentEditForm = ({
     time: '',
     selectedServices: [],
     notes: '',
+    customerPackage: null,
+    packageSessionCount: 1,
+    manualDuration: '', // Manuel süre için eklendi
   });
 
   const [serviceSearch, setServiceSearch] = useState('');
@@ -46,6 +54,8 @@ const AppointmentEditForm = ({
         time: initialData.time || '',
         selectedServices,
         notes: initialData.notes || '',
+        customerPackage: initialData.customerPackage || null,
+        packageSessionCount: initialData.packageSessionCount || 1,
       });
 
       // Toplam süre ve fiyatı hesapla
@@ -86,138 +96,29 @@ const AppointmentEditForm = ({
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    console.log('🔧 FORM SUBMIT START - EDIT MODE');
-    console.log('📋 Form state:', form);
-    console.log('📋 Initial data:', initialData);
-    console.log('📋 Selected services:', form.selectedServices);
-    console.log('📋 Total duration:', totalDuration);
-  
-    const requiredFields = ['customerId', 'employeeId', 'date', 'time'];
-    const hasEmpty = requiredFields.some((field) => !form[field]);
-    
-    console.log('📋 Required fields check:');
-    requiredFields.forEach(field => {
-      console.log(`  - ${field}:`, form[field]);
-    });
-    
-    if (form.selectedServices.length === 0) {
-      console.log('❌ No services selected');
-      alert('En az bir hizmet seçmelisiniz.');
-      return;
+  // Müşteri seçildiğinde paketlerini çek
+  useEffect(() => {
+    if (form.customerId) {
+      console.log('🔄 Müşteri paketleri yükleniyor:', form.customerId);
+      dispatch(fetchCustomerPackages(form.customerId));
     }
-  
-    if (hasEmpty) {
-      console.log('❌ Required fields missing:', requiredFields.filter(field => !form[field]));
-      alert('Tüm alanları doldurunuz.');
-      return;
+  }, [dispatch, form.customerId]);
+
+  // form.customerPackage sadece ID olabilir, store'dan gerçek paketi bul
+  const effectiveCustomerPackage = useMemo(() => {
+    const maybe = form.customerPackage;
+    // Zaten remainingQuantity varsa doğrudan kullan
+    if (maybe && typeof maybe === 'object' && maybe.remainingQuantity != null) {
+      return maybe;
     }
-
-    const selectedServicesData = form.selectedServices.map(svc => ({
-      _id: svc.value,
-      name: svc.label.split(' (')[0],
-      duration: svc.duration,
-      price: svc.price,
-    }));
-
-    console.log('📋 Selected services data:', selectedServicesData);
-
-    const payload = {
-      employee: form.employeeId,
-      customer: form.customerId,
-      date: form.date,
-      time: form.time,
-      services: selectedServicesData,
-      duration: totalDuration,
-      notes: form.notes,
-      force: false, // Varsayılan olarak force false
-    };
-    
-    console.log('📋 Final payload to send:', JSON.stringify(payload, null, 2));
-  
-    // Çakışma kontrolü - daha detaylı log
-    console.log('🔍 CONFLICT CHECK START');
-    console.log('📋 Checking for employee:', form.employeeId);
-    console.log('📋 Checking for date:', form.date);
-    console.log('📋 Excluding appointment ID:', initialData?._id);
-    
-    const [sh, sm] = form.time.split(':').map(Number);
-    const slotStart = new Date(0, 0, 0, sh, sm);
-    const slotEnd = new Date(slotStart.getTime() + totalDuration * 60000);
-    
-    console.log('📋 Proposed time slot:', {
-      start: `${sh}:${sm}`,
-      end: `${slotEnd.getHours()}:${slotEnd.getMinutes()}`,
-      duration: totalDuration
-    });
-
-    const employeeAppointments = appointments.filter(
-        (app) => {
-            const empId = app.employee?._id || app.employee;
-            const matches = empId === form.employeeId &&
-                           app.date === form.date &&
-                           app._id !== initialData?._id && // Düzenlenen randevuyu hariç tut
-                           app.status !== "cancelled";
-            
-            if (matches) {
-              console.log('📋 Found conflicting appointment candidate:', {
-                id: app._id,
-                time: app.time,
-                duration: app.duration,
-                employee: app.employee?.name || app.employee
-              });
-            }
-            
-            return matches;
-        }
-    );
-    
-    console.log('📋 Employee appointments on same date:', employeeAppointments.length);
-
-    const isConflicting = employeeAppointments.some((app) => {
-        if (!app.time) return false;
-
-        const [ah, am] = app.time.split(':').map(Number);
-        const appStart = new Date(0, 0, 0, ah, am);
-        const appEnd = new Date(appStart.getTime() + (app.duration || 30) * 60000);
-
-        const conflict = (
-            (slotStart >= appStart && slotStart < appEnd) ||
-            (slotEnd > appStart && slotEnd <= appEnd) ||
-            (slotStart <= appStart && slotEnd >= appEnd)
-        );
-        
-        if (conflict) {
-          console.log('⚠️ CONFLICT DETECTED with appointment:', {
-            id: app._id,
-            time: app.time,
-            duration: app.duration,
-            appStart: `${appStart.getHours()}:${appStart.getMinutes()}`,
-            appEnd: `${appEnd.getHours()}:${appEnd.getMinutes()}`,
-            proposedStart: `${slotStart.getHours()}:${slotStart.getMinutes()}`,
-            proposedEnd: `${slotEnd.getHours()}:${slotEnd.getMinutes()}`
-          });
-        }
-        
-        return conflict;
-    });
-    
-    console.log('📋 Is conflicting:', isConflicting);
-    
-    if (isConflicting) {
-      console.log('⚠️ Showing conflict modal');
-      setPendingSubmit(payload); // Çakışma durumunda payload'u sakla
-      setShowConfirmModal(true); // Onay modalını göster
-      return;
+    // ID/string durumunda store'dan gerçek paketi bul
+    const id = typeof maybe === 'string' ? maybe : maybe?._id;
+    if (id) {
+      return customerPackages.find(p => p._id === id) || null;
     }
-  
-    console.log('✅ No conflict - submitting directly');
-    // Saat uygunsa direkt gönder
-    onSubmit(payload);
-  };
-  
+    return null;
+  }, [form.customerPackage, customerPackages]);
+
   const serviceOptions = useMemo(() => {
     return availableServices.map((s) => ({
       value: s._id,
@@ -324,6 +225,77 @@ const AppointmentEditForm = ({
     initialData,
   ]);
   
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    console.log('🚀 FORM SUBMIT DEBUG:');
+    console.log('📋 Form state:', form);
+    console.log('📋 Selected services:', form.selectedServices);
+    console.log('📋 Customer ID:', form.customerId);
+    console.log('📋 Employee ID:', form.employeeId);
+    console.log('📋 Date:', form.date);
+    console.log('📋 Time:', form.time);
+    
+    // Validate form
+    if (!form.customerId || !form.employeeId || !form.date || !form.time || form.selectedServices.length === 0) {
+      console.log('❌ VALIDATION FAILED');
+      alert('Lütfen tüm alanları doldurun');
+      return;
+    }
+    
+    // Paket seansı kontrolü (effectiveCustomerPackage üzerinden)
+    if (effectiveCustomerPackage && form.packageSessionCount) {
+      const remainingSessions = effectiveCustomerPackage.remainingQuantity || 0;
+      if (form.packageSessionCount > remainingSessions) {
+        alert(`Bu paketin yeterli seansı yok. Kalan seans: ${remainingSessions}, İstenen: ${form.packageSessionCount}`);
+        return;
+      }
+    }
+    
+    // Check if the selected time slot is available
+    const selectedTimeOption = timeOptions.find(opt => opt.value === form.time);
+    const isTimeSlotBusy = selectedTimeOption?.label.includes('dolu');
+    
+    // services alanını backend'in beklediği şekilde ID'lere mapleyelim
+    const serviceIds = (form.selectedServices || [])
+      .map(s => {
+        console.log('🔍 Processing service:', s);
+        if (s && typeof s === 'object') {
+          return s.value || s._id || s.serviceId;
+        }
+        return s;
+      })
+      .filter(Boolean);
+  
+    console.log('🔍 Final service IDs:', serviceIds);
+  
+    // Backend için doğru payload
+    const appointmentData = {
+      employee: form.employeeId,
+      customer: form.customerId,
+      date: form.date,
+      time: form.time,
+      notes: form.notes || '',
+      duration: form.manualDuration ? parseInt(form.manualDuration, 10) : totalDuration,
+      services: serviceIds,
+    };
+  
+    // Paket bilgisi varsa ekleyelim
+    if (effectiveCustomerPackage?._id && form.packageSessionCount && 
+        form.packageSessionCount <= (effectiveCustomerPackage.remainingQuantity || 0)) {
+      appointmentData.customerPackage = { _id: effectiveCustomerPackage._id };
+      appointmentData.packageSessionCount = form.packageSessionCount;
+    }
+    
+    console.log('🚀 Final payload:', appointmentData);
+    
+    if (isTimeSlotBusy) {
+      setPendingSubmit(appointmentData);
+      setShowConfirmModal(true);
+    } else {
+      onSubmit(appointmentData);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -429,6 +401,47 @@ const AppointmentEditForm = ({
           rows={3}
         />
       </div>
+
+      {/* Paket Bilgisi - Mevcut paket kullanımı */}
+      {effectiveCustomerPackage && (
+        <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+          <h4 className="font-medium text-blue-900 mb-2">📦 Paket Kullanımı</h4>
+          <p><strong>Paket:</strong> {effectiveCustomerPackage.package?.service?.name || 'Hizmet'}</p>
+          <p>
+            <strong>Paket Seansı:</strong> {effectiveCustomerPackage.totalQuantity} | 
+            <span className="ml-2">Kalan: {effectiveCustomerPackage.remainingQuantity}</span>
+          </p>
+        </div>
+      )}
+      
+      {/* Paket Ayarları */}
+      {effectiveCustomerPackage && (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Kullanılacak Seans Sayısı
+          </label>
+          <select
+            value={form.packageSessionCount}
+            onChange={(e) => setForm({ ...form, packageSessionCount: parseInt(e.target.value) })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            {Array.from({ length: Math.min(
+              Math.max(effectiveCustomerPackage?.remainingQuantity || 0, 1), 10) }, (_, i) => i + 1).map(num => (
+              <option key={num} value={num} disabled={num > (effectiveCustomerPackage?.remainingQuantity || 0)}>
+                {num} seans {num > (effectiveCustomerPackage?.remainingQuantity || 0) ? '(Yetersiz)' : ''}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Kalan: {effectiveCustomerPackage?.remainingQuantity || 0} seans
+          </p>
+          {(effectiveCustomerPackage?.remainingQuantity || 0) === 0 && (
+            <p className="text-xs text-red-500 mt-1">
+              ⚠️ Bu paketin hiç seansı kalmamış. Lütfen başka bir paket seçin.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Butonlar */}
       <div className="flex justify-end space-x-3">

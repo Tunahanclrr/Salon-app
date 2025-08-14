@@ -102,9 +102,16 @@ const appointmentsSlice = createSlice({
       .addCase(updateAppointment.fulfilled, (state, action) => {
         state.status = 'succeeded';
         // Güncellenen randevuyu listede güncelle
-        const index = state.items.findIndex(app => app._id === action.payload._id);
+        const index = state.items.findIndex(app => app._id === action.payload._id || 
+                                     app._id === action.payload.data?._id);
         if (index !== -1) {
-          state.items[index] = action.payload;
+          // Backend'den gelen yanıt formatına göre doğru veriyi al
+          const updatedAppointment = action.payload.data || action.payload;
+          state.items[index] = updatedAppointment;
+        } else {
+          // Eğer bulunamazsa, yeni randevuyu listeye ekle
+          const newAppointment = action.payload.data || action.payload;
+          state.items.push(newAppointment);
         }
         state.currentAppointment = null; // Düzenleme tamamlandı
       })

@@ -6,6 +6,7 @@ import {
   register, 
   updatePermissions, 
   toggleUserStatus,
+  deleteUser,
   clearError 
 } from '../redux/authSlice';
 import { 
@@ -28,6 +29,9 @@ const AdminPanel = () => {
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingPermissions, setEditingPermissions] = useState(null);
   const [permissions, setPermissions] = useState({});
+  // Kullanıcı silme onayı için state ekliyorum
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [newUser, setNewUser] = useState({
     username: '',
     email: '',
@@ -66,10 +70,33 @@ const AdminPanel = () => {
   };
 
   const handleToggleStatus = (userId) => {
-    dispatch(toggleUserStatus(userId));
-    toast.success('Kullanıcı durumu güncellendi!');
+    // Kullanıcı aktifse (silme işlemi için) onay iste
+    const user = users.find(u => u._id === userId);
+    if (user && user.isActive) {
+      setUserToDelete(userId);
+      setConfirmModalOpen(true);
+    } else {
+      // Pasif kullanıcıyı aktifleştirme işlemi doğrudan yapılabilir
+      dispatch(toggleUserStatus(userId));
+      toast.success('Kullanıcı durumu güncellendi!');
+    }
   };
 
+  const handleConfirmDelete = () => {
+    if (userToDelete) {
+      dispatch(deleteUser(userToDelete))
+        .unwrap()
+        .then(() => {
+          toast.success('Kullanıcı başarıyla silindi!');
+        })
+        .catch((error) => {
+          toast.error(error || 'Kullanıcı silinirken bir hata oluştu!');
+        });
+    }
+    setConfirmModalOpen(false);
+    setUserToDelete(null);
+  };
+  
   const handlePermissionChange = (permission, value) => {
     setEditingPermissions(prev => ({
       ...prev,
@@ -408,6 +435,34 @@ const AdminPanel = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      {confirmModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Kullanıcıyı Sil</h3>
+            <p className="mb-6">Kullanıcıyı silmek istediğinizden emin misiniz?</p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setConfirmModalOpen(false);
+                  setUserToDelete(null);
+                }}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

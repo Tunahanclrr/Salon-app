@@ -30,11 +30,15 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
       const serviceIds = [];
       console.log('Dragging appointment with services:', appointment.services);
       
+      // Hizmet ID'lerini daha güvenilir bir şekilde al
       if (appointment.services && appointment.services.length > 0) {
         appointment.services.forEach(service => {
           if (service._id) {
             // Doğrudan _id değeri varsa kullan
             serviceIds.push(service._id);
+          } else if (service.serviceId) {
+            // Bazı durumlarda serviceId olarak saklanmış olabilir
+            serviceIds.push(service.serviceId);
           } else if (service.name && services) {
             // _id yoksa, önce hizmet adı ve süresine göre eşleştirme yap
             let matchedService = services.find(s => 
@@ -49,13 +53,6 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
               );
             }
             
-            // Hala bulunamazsa, hizmet adının bir kısmını içeren herhangi bir hizmeti bul
-            if (!matchedService) {
-              matchedService = services.find(s => 
-                s.name.toLowerCase().includes(service.name.toLowerCase()) || 
-                service.name.toLowerCase().includes(s.name.toLowerCase())
-              );
-            }
             if (matchedService && matchedService._id) {
               serviceIds.push(matchedService._id);
             }
@@ -65,13 +62,16 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
       
       console.log('Service IDs for drag:', serviceIds);
 
+      // Randevu verilerini daha kapsamlı bir şekilde aktar
       const payload = {
         id: appointment._id,
         employeeId: appointment.employee?._id,
         date: appointment.date,
         time: appointment.time,
         duration: appointment.duration,
-        serviceIds: serviceIds, // Doğrudan _id değerlerini kullan
+        serviceIds: serviceIds,
+        // Ek olarak tüm hizmet bilgilerini de gönder
+        services: appointment.services
       };
 
       return payload;
@@ -110,8 +110,6 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
   } else {
     appointmentColorClass = colorPalette[employeeIndex % colorPalette.length];
   }
-
-  const appointmentZIndex = appointment.zIndex || 20;
 
   return (
     <div
@@ -199,13 +197,25 @@ const DraggableAppointment = ({ appointment, onEdit, services }) => {
              marginTop: '1px',
              wordWrap: 'break-word',
              overflowWrap: 'break-word',
+             hyphens: 'auto',
            }}>
-        {appointment.time} -{' '}
-        {new Date(
-          new Date(0, 0, 0, startHour, startMinute).getTime() +
-            durationInMinutes * 60000
-        ).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        {appointment.time} • {appointment.duration}dk
       </div>
+
+      {/* Paket kullanım bilgisi */}
+      {appointment.customerPackage && (
+        <div className="text-blue-600 package-info font-semibold leading-tight"
+             style={{
+               fontSize: window.innerWidth <= 767 ? '6px' : '10px',
+               lineHeight: '1.1',
+               marginTop: '1px',
+               wordWrap: 'break-word',
+               overflowWrap: 'break-word',
+               hyphens: 'auto',
+             }}>
+          📦 Paket ({appointment.packageSessionCount || 1} seans)
+        </div>
+      )}
     </div>
   );
 };
@@ -298,10 +308,14 @@ const Appointments = () => {
   const filteredUsers = useMemo(() => {
     if (!currentUser) return [];
     
-    // Tüm kullanıcılar (admin ve employee) tüm çalışanları görebilir
-    // Sadece employee ve admin rolündeki kullanıcıları göster
-    return users.filter(user => user.role === 'employee' || user.role === 'admin');
-  }, [users, currentUser]);
+    if (isAdmin) {
+      // Admin tüm kullanıcıları görebilir
+      return users;
+    } else {
+      // Normal kullanıcı sadece kendisini görebilir
+      return users.filter(user => user._id === currentUser._id);
+    }
+  }, [users, currentUser, isAdmin]);
 
   const allAppointments = useMemo(() => {
     return filteredAppointments.map(app => {
@@ -415,38 +429,63 @@ const Appointments = () => {
   }, [allAppointments, selectedDate]);
 
 
-  const handleAddAppointment = async (formData) => {
-    const result = await dispatch(addAppointment(formData));
+  const handleAddAppointment = async (form) => {
+    const result = await dispatch(addAppointment(form));
     if (addAppointment.fulfilled.match(result)) {
-      toast.success('Randevu başarıyla oluşturuldu');
+      toast.success('Randevu eklendi');
       setAddModalOpen(false);
-      dispatch(fetchAppointments());
-      dispatch(fetchCustomers());
+      // Tüm verileri yeniden çekmek için Promise.all kullanın
+      await Promise.all([
+        dispatch(fetchAppointments()),
+        dispatch(fetchCustomers()),
+        dispatch(fetchServices()),
+        dispatch(fetchUsers())
+      ]);
     } else {
-      toast.error(result.payload?.message || 'Randevu oluşturulamadı');
+      toast.error(result.payload?.message || 'Randevu eklenemedi');
     }
   };
 
-  const handleEditAppointment = async (formData) => {
-    const result = await dispatch(updateAppointment({ id: editingAppointment._id, appointmentData: formData }));
+  const handleEditAppointment = async (form) => {
+    const result = await dispatch(updateAppointment({ id: editingAppointment._id, appointmentData: form }));
     if (updateAppointment.fulfilled.match(result)) {
       toast.success('Randevu güncellendi');
       setEditModalOpen(false);
-      setEditingAppointment(null);
-      dispatch(fetchAppointments());
-      dispatch(fetchCustomers());
+      // Tüm verileri yeniden çekmek için Promise.all kullanın
+      await Promise.all([
+        dispatch(fetchAppointments()),
+        dispatch(fetchCustomers()),
+        dispatch(fetchServices()),
+        dispatch(fetchUsers())
+      ]);
     } else {
       toast.error(result.payload?.message || 'Güncelleme başarısız');
     }
   };
 
+  // Randevu sürükleme işlemini tamamlayan fonksiyon
   const executeDropUpdate = async (appointmentId, updatedData, force = false) => {
     const payload = { ...updatedData, force };
     const result = await dispatch(updateAppointment({ id: appointmentId, appointmentData: payload }));
 
     if (updateAppointment.fulfilled.match(result)) {
       toast.success('Randevu başarıyla güncellendi');
-      await dispatch(fetchAppointments());
+      // Tüm verileri yeniden çekmek için Promise.all kullanın
+      try {
+        // Önce appointments'ı çekelim
+        await dispatch(fetchAppointments());
+        // Sonra diğer verileri paralel olarak çekelim
+        await Promise.all([
+          dispatch(fetchCustomers()),
+          dispatch(fetchServices()),
+          dispatch(fetchUsers())
+        ]);
+        
+        // getState() fonksiyonu yerine doğrudan yeni veri çekme işlemi yapıyoruz
+        // Redux store'dan güncel appointments'ı almaya gerek yok
+      } catch (error) {
+        console.error('Veri yenileme hatası:', error);
+      }
     } else {
       if (result.payload?.conflict && !force) {
         toast.error('Bu saat aralığında çalışanın başka bir randevusu var. Lütfen manuel deneyin.');
@@ -458,6 +497,7 @@ const Appointments = () => {
     setShowConfirmDropModal(false);
   };
 
+  // Randevu sürükleme işlemini yöneten fonksiyon
   const handleDropAppointment = async (
     appointmentId,
     newEmployeeId,
@@ -465,11 +505,20 @@ const Appointments = () => {
     newTime,
     droppedServiceIds
   ) => {
-    const appointmentToUpdate = allAppointments.find(app => app._id === appointmentId);
+    // Doğrudan appointments state'ini kullanın, allAppointments yerine
+    let appointmentToUpdate = appointments.find(app => app._id === appointmentId);
 
+    // Eğer randevu bulunamazsa, verileri yeniden çekin ve tekrar deneyin
     if (!appointmentToUpdate) {
-      toast.error('Randevu bulunamadı!');
-      return;
+      await dispatch(fetchAppointments());
+      // Redux store'dan güncel appointments'ı alın
+      const state = useSelector(state => state);
+      appointmentToUpdate = state.appointments.items.find(app => app._id === appointmentId);
+      
+      if (!appointmentToUpdate) {
+        toast.error('Randevu bulunamadı! Lütfen sayfayı yenileyin.');
+        return;
+      }
     }
 
     console.log('Drop appointment with ID:', appointmentId);
@@ -539,6 +588,14 @@ const Appointments = () => {
     // Calculate total duration
     const totalDuration = selectedServices.reduce((sum, svc) => sum + (svc.duration || 30), 0);
 
+    // Hizmet bilgilerini tam olarak gönder (servicePayload)
+    const servicePayload = selectedServices.map(svc => ({
+      _id: svc._id,
+      name: svc.name,
+      duration: svc.duration,
+      price: svc.price,
+    }));
+
     const updatedData = {
       employee: newEmployeeId,
       customer: typeof appointmentToUpdate.customer === 'object' 
@@ -548,24 +605,25 @@ const Appointments = () => {
       time: newTime,
       notes: appointmentToUpdate.notes || '',
       duration: totalDuration,
-      services: selectedServices.map(svc => ({
-        _id: svc._id,
-        name: svc.name,
-        duration: svc.duration,
-        price: svc.price,
-      })),
+      services: servicePayload, // Tam hizmet bilgilerini gönder
     };
 
     const [sh, sm] = newTime.split(':').map(Number);
     const proposedSlotStart = new Date(0, 0, 0, sh, sm);
     const proposedSlotEnd = new Date(proposedSlotStart.getTime() + updatedData.duration * 60000);
 
-    const employeeAppointmentsOnDate = allAppointments.filter(
-      (app) =>
-        app.employee?._id === newEmployeeId &&
-        app.date === newDate &&
-        app._id !== appointmentId && 
-        app.status !== "cancelled"
+    // Çakışma kontrolü için güncel appointments kullanın
+    const employeeAppointmentsOnDate = appointments.filter(
+      (app) => {
+        const employeeId = typeof app.employee === 'object' && app.employee !== null 
+          ? app.employee._id 
+          : app.employee;
+        
+        return employeeId === newEmployeeId &&
+          app.date === newDate &&
+          app._id !== appointmentId && 
+          app.status !== "cancelled";
+      }
     );
 
     const isConflicting = employeeAppointmentsOnDate.some((app) => {
@@ -588,18 +646,6 @@ const Appointments = () => {
     }
   };
 
-
-  const handleAddCustomer = async (form) => {
-    const result = await dispatch(addCustomer(form));
-    if (addCustomer.fulfilled.match(result)) {
-      toast.success('Müşteri eklendi');
-      setCustomerModalOpen(false);
-      dispatch(fetchCustomers());
-    } else {
-      toast.error(result.payload?.message || 'Müşteri eklenemedi');
-    }
-  };
-
   const handleCustomerNotArrived = async (appointmentId, status) => {
     try {
       const result = await dispatch(updateCustomerNotArrived({ 
@@ -609,7 +655,13 @@ const Appointments = () => {
       
       if (updateCustomerNotArrived.fulfilled.match(result)) {
         toast.success(status ? 'Müşteri gelmedi olarak işaretlendi' : 'Müşteri geldi olarak işaretlendi');
-        dispatch(fetchAppointments());
+        // Tüm verileri yeniden çekmek için Promise.all kullanın
+        await Promise.all([
+          dispatch(fetchAppointments()),
+          dispatch(fetchCustomers()),
+          dispatch(fetchServices()),
+          dispatch(fetchUsers())
+        ]);
         
         // Eğer modal açıksa, seçili randevuyu güncelle
         if (selectedAppointment && selectedAppointment._id === appointmentId) {
@@ -623,6 +675,18 @@ const Appointments = () => {
       }
     } catch (error) {
       toast.error('Bir hata oluştu');
+    }
+  };
+
+  // Müşteri ekleme fonksiyonu
+  const handleAddCustomer = async (form) => {
+    const result = await dispatch(addCustomer(form));
+    if (addCustomer.fulfilled.match(result)) {
+      toast.success('Müşteri eklendi');
+      setCustomerModalOpen(false);
+      await dispatch(fetchCustomers());
+    } else {
+      toast.error(result.payload?.message || 'Müşteri eklenemedi');
     }
   };
 
@@ -743,27 +807,18 @@ const Appointments = () => {
                 key={user._id} 
                 className="relative border-r border-gray-100 bg-white employee-column"
               >
-                {/* Her saat dilimi için TimeSlot bileşeni */}
-                {timeSlots.map((slot) => (
+                {timeSlots.map((time) => (
                   <TimeSlot
-                    key={`${user._id}-${slot}`}
-                    time={slot}
+                    key={`${user._id}-${selectedDate}-${time}`}
+                    time={time}
                     date={selectedDate}
                     employee={user}
                     onDropAppointment={handleDropAppointment}
                     onDoubleClick={handleSlotDoubleClick}
                   />
                 ))}
-                
-                {/* Randevuları üstte göster */}
                 {appointmentsWithOverlapInfo
-                  .filter(app => {
-                    // Sadece tarih kontrolü yap
-                    if (app.date !== selectedDate) return false;
-                    
-                    // Bu randevunun bu kullanıcıya ait olup olmadığını kontrol et
-                    return app.employee?._id === user._id;
-                  })
+                  .filter(app => app.employee?._id === user._id && app.date === selectedDate)
                   .map(app => (
                     <DraggableAppointment
                       key={app._id}

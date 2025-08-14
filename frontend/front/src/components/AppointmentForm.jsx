@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Select from "react-select";
 import { fetchServices } from "../redux/servicesSlice";
+import { fetchCustomerPackages } from "../redux/customerPackagesSlice";
 
 // Basit Modal bileşeni
 function Modal({ open, onClose, children }) {
@@ -34,18 +35,22 @@ const AppointmentForm = ({
 }) => {
   const dispatch = useDispatch();
   const { items: servicesFromRedux, loading } = useSelector((state) => state.services);
+  const { items: customerPackages } = useSelector((state) => state.customerPackages);
   
   // Services'i Redux'tan veya props'tan al
   const services = servicesFromRedux && servicesFromRedux.length > 0 ? servicesFromRedux : servicesFromProps || [];
 
   // Form state ve validasyon hataları
   const [form, setForm] = useState({
-    employeeId: "",
-    customerId: "",
-    date: "",
-    time: "",
+    customerId: initialData?.customerId || "",
+    employeeId: initialData?.employeeId || "",
+    date: initialData?.date || new Date().toISOString().split("T")[0],
+    time: initialData?.time || "",
     selectedServices: [],
-    notes: "",
+    notes: initialData?.notes || "",
+    selectedCustomerPackage: null,
+    packageSessionCount: 1,
+    // manualDuration kaldırıldı
   });
   const [errors, setErrors] = useState({});
 
@@ -69,6 +74,21 @@ const AppointmentForm = ({
     dispatch(fetchServices());
   }, [dispatch]);
 
+  // Müşteri seçildiğinde paketlerini çek
+  useEffect(() => {
+    if (form.customerId) {
+      console.log('🔄 Müşteri paketleri yükleniyor:', form.customerId);
+      dispatch(fetchCustomerPackages(form.customerId));
+    }
+  }, [dispatch, form.customerId]);
+
+  // Debug: Müşteri paketlerini kontrol et
+  useEffect(() => {
+    console.log('📦 Müşteri paketleri:', customerPackages);
+    console.log('👤 Seçili müşteri:', form.customerId);
+    console.log('📦 Paket sayısı:', customerPackages.length);
+  }, [customerPackages, form.customerId]);
+
   // Debounce müşteri araması için
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -80,46 +100,83 @@ const AppointmentForm = ({
   // initialData değişince formu setle
   useEffect(() => {
     if (initialData) {
-      setForm((prev) => ({
-        ...prev,
-        employeeId: initialData.employeeId || prev.employeeId,
-        date: initialData.date || prev.date,
-        time: initialData.time || prev.time,
-        selectedServices: initialData.serviceId
-          ? [services.find((s) => s._id === initialData.serviceId)]
-              .filter(Boolean)
-              .map((svc) => ({
-                value: svc._id,
-                label: `${svc.name} (${svc.duration} dk)`,
-                duration: svc.duration,
-                price: svc.price,
-              }))
-          : prev.selectedServices,
-      }));
+      setForm((prev) => {
+        // Her zaman kullanıcının seçtiği hizmetleri koru
+        const shouldKeepServices = prev.selectedServices.length > 0;
+
+        return {
+          ...prev,
+          customerId: initialData.customerId || prev.customerId,
+          employeeId: initialData.employeeId || prev.employeeId,
+          date: initialData.date || prev.date,
+          time: initialData.time || prev.time,
+          // Kullanıcının seçtiği hizmetleri her zaman koru
+          selectedServices: shouldKeepServices
+            ? prev.selectedServices
+            : initialData.serviceId
+              ? [services.find((s) => s._id === initialData.serviceId)]
+                  .filter(Boolean)
+                  .map((svc) => ({
+                    value: svc._id,
+                    label: `${svc.name} (${svc.duration} dk)`,
+                    duration: svc.duration,
+                    price: svc.price,
+                  }))
+              : prev.selectedServices,
+        };
+      });
     }
   }, [initialData, services]);
 
-  // Seçili hizmetler değişince toplam süre ve fiyatı güncelle
+  // Seçili hizmetler veya paket değişince toplam süre ve fiyatı güncelle
   useEffect(() => {
-    const duration = form.selectedServices.reduce(
-      (sum, svc) => sum + (svc.duration || 0),
-      0
-    );
-    const price = form.selectedServices.reduce(
-      (sum, svc) => sum + (svc.price || 0),
-      0
-    );
-    setTotalDuration(duration);
-    setTotalPrice(price);
-  }, [form.selectedServices]);
+    if (form.selectedCustomerPackage) {
+      // Paket seçilmişse paketin süresini kullan
+      const packageDuration = (form.selectedCustomerPackage.package?.service?.duration || 0) * form.packageSessionCount;
+      setTotalDuration(packageDuration);
+      setTotalPrice(0); // Paket ücretsiz
+    } else {
+      // Normal hizmetler için hesapla
+      const duration = form.selectedServices.reduce(
+        (sum, svc) => sum + (svc.duration || 0),
+        0
+      );
+      const price = form.selectedServices.reduce(
+        (sum, svc) => sum + (svc.price || 0),
+        0
+      );
+      setTotalDuration(duration);
+      setTotalPrice(price);
+    }
+  }, [form.selectedServices, form.selectedCustomerPackage, form.packageSessionCount]);
 
   // --- OPTIONS ---
-  const serviceOptions = services.map((svc) => ({
-    value: svc._id,
-    label: `${svc.name} (${svc.duration} dk) - ₺${(svc.price ?? 0).toFixed(2)}`,
-    duration: svc.duration,
-    price: svc.price ?? 0,
-  }));
+  const serviceOptions = useMemo(() => {
+    // Normal hizmetler
+    const normalServices = services.map((svc) => ({
+      value: svc._id,
+      label: `${svc.name} (${svc.duration} dk) - ₺${(svc.price ?? 0).toFixed(2)}`,
+      duration: svc.duration,
+      price: svc.price ?? 0,
+    }));
+
+    // Paket hizmetleri (eğer müşteri seçilmişse ve paketleri varsa)
+    const packageServices = form.customerId && customerPackages.length > 0 
+      ? customerPackages
+          .filter(pkg => pkg.status === 'active' && pkg.remainingQuantity > 0)
+          .map(pkg => ({
+            value: `package_${pkg._id}`,
+            label: `📦 ${pkg.package?.service?.name || 'Paket Hizmeti'} (${pkg.package?.service?.duration || 0} dk) - ${pkg.remainingQuantity} seans kaldı`,
+            duration: pkg.package?.service?.duration || 0,
+            price: 0,
+            isPackage: true,
+            packageData: pkg
+          }))
+      : [];
+
+    // Paket hizmetlerini en üste koy
+    return [...packageServices, ...normalServices];
+  }, [services, customerPackages, form.customerId]);
 
   const employeeOptions = users
     .filter((user) => user.role === 'employee' || user.role === 'admin')
@@ -258,8 +315,12 @@ const AppointmentForm = ({
     if (!form.employeeId) newErrors.employeeId = "Çalışan seçimi zorunludur.";
     if (!form.date) newErrors.date = "Tarih zorunludur.";
     if (!form.time) newErrors.time = "Saat seçimi zorunludur.";
-    if (form.selectedServices.length === 0)
+    
+    // Paket seçilmişse hizmet seçimi zorunlu değil, aksi takdirde zorunlu
+    if (form.selectedServices.length === 0 && !form.selectedCustomerPackage) {
       newErrors.selectedServices = "En az bir hizmet seçmelisiniz.";
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -275,17 +336,48 @@ const AppointmentForm = ({
       return;
     }
 
-    const selectedServicesForPayload = form.selectedServices.map((svc) => ({
+    // Paket hizmetleri ve normal hizmetleri ayır
+    const packageServices = form.selectedServices.filter(svc => svc.isPackage);
+    const normalServices = form.selectedServices.filter(svc => !svc.isPackage);
+
+    // Normal hizmetler için payload
+    const selectedServicesForPayload = normalServices.map((svc) => ({
       _id: svc.value,
       name: svc.label.split(" (")[0],
       duration: svc.duration,
       price: svc.price,
     }));
 
+    // Paket hizmeti varsa onu da ekle
+    if (packageServices.length > 0) {
+      packageServices.forEach(pkgSvc => {
+        selectedServicesForPayload.push({
+          _id: pkgSvc.packageData?.package?.service?._id,
+          name: pkgSvc.packageData?.package?.service?.name || 'Paket Hizmeti',
+          duration: pkgSvc.duration,
+          price: 0, // Paket hizmeti ücretsiz
+        });
+      });
+    }
+
     const calculatedDuration = selectedServicesForPayload.reduce(
       (total, svc) => total + (svc.duration || 30),
       0
     );
+
+    // Paket bilgisini belirle
+    let customerPackageInfo = null;
+    if (packageServices.length > 0) {
+      customerPackageInfo = {
+        _id: packageServices[0].packageData?._id,
+        sessionCount: form.packageSessionCount
+      };
+    } else if (form.selectedCustomerPackage) {
+      customerPackageInfo = {
+        _id: form.selectedCustomerPackage._id,
+        sessionCount: form.packageSessionCount
+      };
+    }
 
     const payload = {
       customerId: form.customerId,
@@ -293,10 +385,12 @@ const AppointmentForm = ({
       date: form.date,
       time: form.time,
       services: selectedServicesForPayload.map((svc) => svc._id),
-      duration: calculatedDuration,
+      duration: calculatedDuration, // Manuel süre kaldırıldı, sadece hesaplanan süre kullanılıyor
       notes: form.notes || undefined,
       force: forceSend,
+      customerPackage: customerPackageInfo,
     };
+    
     console.log("Gönderilen veri:", payload);
     onSubmit(payload);
   };
@@ -340,6 +434,107 @@ const AppointmentForm = ({
             + Yeni Müşteri
           </button>
         </div>
+
+        {/* Müşteri Paketleri - Bu kısmı kaldırıyoruz */}
+        {/* {form.customerId && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Müşteri Paketleri (Opsiyonel)
+              </label>
+              
+              <div className="text-xs text-gray-500 mb-2">
+                Paket sayısı: {customerPackages.length} | 
+                Aktif paketler: {customerPackages.filter(pkg => pkg.status === 'active' && pkg.remainingQuantity > 0).length}
+              </div>
+              
+              <Select
+                options={customerPackages
+                  .filter(pkg => pkg.status === 'active' && pkg.remainingQuantity > 0)
+                  .map(pkg => ({
+                    value: pkg._id,
+                    label: `${pkg.package?.service?.name || 'Hizmet'} - ${pkg.remainingQuantity} seans kaldı`,
+                    package: pkg
+                  }))}
+                onChange={(opt) => {
+                  setForm({ 
+                    ...form, 
+                    selectedCustomerPackage: opt?.package || null,
+                    packageSessionCount: 1 // Paket seçildiğinde seans sayısını sıfırla
+                  });
+                }}
+                placeholder={customerPackages.length === 0 ? "Müşterinin paketi bulunmuyor..." : "Paket seçin (opsiyonel)..."}
+                isClearable
+                classNamePrefix="react-select"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Paket seçerseniz, randevu ücretsiz olacak ve seans kullanılacak
+              </p>
+            </div>
+          </div>
+        )} */}
+
+        {/* Paket seçildiğinde seans sayısı ve manuel süre seçimi */}
+        {(form.selectedCustomerPackage || form.selectedServices.some(svc => svc.isPackage)) && (
+          <div className="bg-blue-50 p-4 rounded-lg space-y-4">
+            <h4 className="font-medium text-blue-900">Paket Ayarları</h4>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kullanılacak Seans Sayısı
+                </label>
+                <select
+                  value={form.packageSessionCount}
+                  onChange={(e) => setForm({ ...form, packageSessionCount: parseInt(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {Array.from({ length: Math.min(
+                    form.selectedCustomerPackage?.remainingQuantity || 
+                    form.selectedServices.find(svc => svc.isPackage)?.packageData?.remainingQuantity || 
+                    10, 10) }, (_, i) => i + 1).map(num => (
+                    <option key={num} value={num}>{num} seans</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Kalan: {form.selectedCustomerPackage?.remainingQuantity || 
+                  form.selectedServices.find(svc => svc.isPackage)?.packageData?.remainingQuantity || 0} seans
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Manuel Süre (dakika)
+                </label>
+                <input
+                  type="number"
+                  value={form.manualDuration}
+                  onChange={(e) => setForm({ ...form, manualDuration: e.target.value })}
+                  placeholder="Otomatik hesaplanacak"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  min="1"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Boş bırakırsanız otomatik hesaplanır
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-3 rounded border">
+              <p className="text-sm text-gray-700">
+                <strong>Seçilen Paket:</strong> {
+                  form.selectedCustomerPackage?.package?.service?.name || 
+                  form.selectedServices.find(svc => svc.isPackage)?.packageData?.package?.service?.name || 
+                  'Hizmet'
+                }
+              </p>
+              <p className="text-sm text-gray-600">
+                {form.packageSessionCount} seans kullanılacak • 
+                Süre otomatik hesaplanacak
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Çalışan seçimi */}
         <div>
@@ -398,7 +593,7 @@ const AppointmentForm = ({
               isDisabled={
                 !form.employeeId ||
                 !form.date ||
-                form.selectedServices.length === 0
+                (form.selectedServices.length === 0 && !form.selectedCustomerPackage)
               }
               noOptionsMessage={() => "Uygun zaman aralığı bulunamadı"}
               classNamePrefix="react-select"
@@ -448,13 +643,44 @@ const AppointmentForm = ({
             isMulti
             options={serviceOptions}
             value={form.selectedServices}
-            onChange={(selected) =>
-              setForm({ ...form, selectedServices: selected || [] })
-            }
+            onChange={(selected) => {
+              const selectedArray = selected || [];
+              
+              // Paket hizmeti seçildi mi kontrol et
+              const packageService = selectedArray.find(svc => svc.isPackage);
+              
+              if (packageService) {
+                // Paket seçildiğinde paket bilgilerini güncelle ve sadece paket hizmetini bırak
+                setForm({ 
+                  ...form, 
+                  selectedServices: [packageService],
+                  selectedCustomerPackage: packageService.packageData,
+                  packageSessionCount: 1
+                });
+              } else {
+                // Normal hizmet seçimi
+                setForm({ 
+                  ...form, 
+                  selectedServices: selectedArray,
+                  selectedCustomerPackage: null,
+                  packageSessionCount: 1
+                });
+              }
+            }}
             placeholder="Hizmet seçin..."
             classNamePrefix="react-select"
             isLoading={loading}
             closeMenuOnSelect={false}
+            styles={{
+              option: (provided, state) => ({
+                ...provided,
+                backgroundColor: state.data?.isPackage 
+                  ? (state.isSelected ? '#2563eb' : '#dbeafe')
+                  : (state.isSelected ? '#3b82f6' : 'white'),
+                color: state.data?.isPackage && !state.isSelected ? '#1e40af' : provided.color,
+                fontWeight: state.data?.isPackage ? '600' : 'normal'
+              })
+            }}
           />
           {errors.selectedServices && (
             <p className="text-red-600 text-sm mt-1">

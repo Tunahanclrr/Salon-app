@@ -5,6 +5,7 @@ import appointmentsReducer from './redux/appointmentsSlice';
 import servicesReducer from './redux/servicesSlice';
 import packageSalesReducer from './redux/packageSalesSlice';
 import packagesReducer from './redux/packagesSlice';
+import customerPackagesReducer from './redux/customerPackagesSlice';
 import authReducer from './redux/authSlice';
 
 export const store = configureStore({
@@ -16,5 +17,6 @@ export const store = configureStore({
     services: servicesReducer,
     packageSales: packageSalesReducer,
     packages: packagesReducer,
+    customerPackages: customerPackagesReducer,
   },
 });

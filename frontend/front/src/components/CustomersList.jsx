@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchCustomers, deleteCustomer, addCustomer } from '../redux/customersSlice';
 import Modal from './Modal';
 import CustomerForm from './CustomerForm';
+import CustomerPackages from './CustomerPackages';
 import * as XLSX from 'xlsx';
 
 export default function CustomersList() {
@@ -15,6 +16,8 @@ export default function CustomersList() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importData, setImportData] = useState([]);
   const [importLoading, setImportLoading] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   useEffect(() => {
     dispatch(fetchCustomers());
@@ -223,12 +226,23 @@ export default function CustomersList() {
                   <td className="py-2 px-4">{customer.email}</td>
                   <td className="py-2 px-4">{customer.notes || '-'}</td>
                   <td className="py-2 px-4 text-center">
-                    <button
-                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm shadow"
-                      onClick={() => handleDeleteCustomer(customer._id)}
-                    >
-                      Sil
-                    </button>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm shadow"
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          setDetailModalOpen(true);
+                        }}
+                      >
+                        Detay
+                      </button>
+                      <button
+                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm shadow"
+                        onClick={() => handleDeleteCustomer(customer._id)}
+                      >
+                        Sil
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -335,6 +349,41 @@ export default function CustomersList() {
             Evet, Sil
           </button>
         </div>
+      </Modal>
+
+      {/* Müşteri detay modalı */}
+      <Modal 
+        open={detailModalOpen} 
+        onClose={() => setDetailModalOpen(false)} 
+        title={`${selectedCustomer?.name || 'Müşteri'} Detayları`}
+      >
+        {selectedCustomer && (
+          <div className="space-y-6">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-3">Müşteri Bilgileri</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-gray-700">Ad Soyad:</span>
+                  <p className="text-gray-900">{selectedCustomer.name}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">Telefon:</span>
+                  <p className="text-gray-900">{selectedCustomer.phone}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">E-posta:</span>
+                  <p className="text-gray-900">{selectedCustomer.email || '-'}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">Not:</span>
+                  <p className="text-gray-900">{selectedCustomer.notes || '-'}</p>
+                </div>
+              </div>
+            </div>
+            
+            <CustomerPackages customerId={selectedCustomer._id} />
+          </div>
+        )}
       </Modal>
     </div>
   );

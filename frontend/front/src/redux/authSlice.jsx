@@ -162,6 +162,32 @@ export const toggleUserStatus = createAsyncThunk(
   }
 );
 
+// Delete user thunk (sadece admin)
+export const deleteUser = createAsyncThunk(
+  'auth/deleteUser',
+  async (userId, { rejectWithValue, getState }) => {
+    try {
+      const { auth } = getState();
+      const response = await fetch(`${API_BASE_URL}/api/auth/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${auth.token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return rejectWithValue(data.message || 'Kullanıcı silinemedi');
+      }
+
+      return userId;
+    } catch (error) {
+      return rejectWithValue('Bağlantı hatası');
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   user: JSON.parse(localStorage.getItem('user')) || null,
@@ -189,11 +215,13 @@ const authSlice = createSlice({
     },
     setCredentials: (state, action) => {
       const { user, token } = action.payload;
-      state.user = user;
+      // Kullanıcıyı normalize et: _id yoksa id'yi _id yap
+      const normalizedUser = { ...user, _id: user._id || user.id };
+      state.user = normalizedUser;
       state.token = token;
       state.isAuthenticated = true;
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
     },
   },
   extraReducers: (builder) => {
@@ -205,12 +233,13 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload.user;
+        // Kullanıcıyı normalize et (_id garanti)
+        const normalizedUser = { ...action.payload.user, _id: action.payload.user._id || action.payload.user.id };
+        state.user = normalizedUser;
         state.token = action.payload.token;
         state.isAuthenticated = true;
-        // Token ve user bilgilerini localStorage'a kaydet
         localStorage.setItem('token', action.payload.token);
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
+        localStorage.setItem('user', JSON.stringify(normalizedUser));
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -239,12 +268,14 @@ const authSlice = createSlice({
       })
       .addCase(getProfile.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload;
+        // Kullanıcıyı normalize et (_id garanti)
+        const normalizedUser = { ...action.payload, _id: action.payload._id || action.payload.id };
+        state.user = normalizedUser;
+        localStorage.setItem('user', JSON.stringify(normalizedUser));
       })
       .addCase(getProfile.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-        // Token geçersizse logout yap
         if (action.payload.includes('token')) {
           state.user = null;
           state.token = null;
@@ -289,6 +320,11 @@ const authSlice = createSlice({
         if (index !== -1) {
           state.users[index] = { ...state.users[index], isActive: updatedUser.isActive };
         }
+      })
+      // Delete User
+      .addCase(deleteUser.fulfilled, (state, action) => {
+        const deletedUserId = action.payload;
+        state.users = state.users.filter(user => user._id !== deletedUserId);
       });
   },
 });
@@ -296,7 +332,15 @@ const authSlice = createSlice({
 export const { logout, clearError, setCredentials } = authSlice.actions;
 
 // Selectors
-export const selectCurrentUser = (state) => state.auth.user;
+// Selectors
+export const selectCurrentUser = createSelector(
+  (state) => state.auth.user,
+  (user) => {
+    if (!user) return null;
+    // _id yoksa id’yi _id olarak map et
+    return user._id ? user : { ...user, _id: user.id };
+  }
+);
 export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
 export const selectAuthLoading = (state) => state.auth.loading;
 export const selectAuthError = (state) => state.auth.error;

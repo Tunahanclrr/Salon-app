@@ -72,7 +72,7 @@ const packagesSlice = createSlice({
       .addCase(fetchPackages.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.loading = false;
-        state.items = action.payload.packages || [];
+        state.items = action.payload.data || [];
       })
       .addCase(fetchPackages.rejected, (state, action) => {
         state.status = 'failed';

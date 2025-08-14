@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { FiUser, FiClock, FiCalendar, FiCheckCircle, FiXCircle, FiPackage, FiEye } from 'react-icons/fi';
+import { FiUser, FiClock, FiCalendar, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 import { fetchAppointments, updateCustomerNotArrived } from '../redux/appointmentsSlice';
-import { fetchPackageSales } from '../redux/packageSalesSlice';
 import { fetchPackages } from '../redux/packagesSlice';
 import { selectCurrentUser, selectIsAdmin } from '../redux/authSlice';
 import { toast } from 'react-toastify';
@@ -14,12 +13,10 @@ export default function MyAppointments() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const appointments = useSelector(state => state.appointments.items);
-  const packageSales = useSelector(state => state.packageSales.items);
   const packages = useSelector(state => state.packages.items);
   const currentUser = useSelector(selectCurrentUser);
   const isAdmin = useSelector(selectIsAdmin);
   const [filter, setFilter] = useState('all'); // all, completed, not-arrived
-  const [packageFilter, setPackageFilter] = useState('all'); // all, active, completed
 
   useEffect(() => {
     console.log('🔄 MyAppointments useEffect - Fetching data...');
@@ -37,7 +34,6 @@ export default function MyAppointments() {
       }
     });
     
-    dispatch(fetchPackageSales());
     dispatch(fetchPackages());
   }, [dispatch]);
 
@@ -79,16 +75,6 @@ export default function MyAppointments() {
     }
   });
 
-  const getPackageName = (packageId) => {
-    // Eğer packageId bir obje ise (populate edilmiş)
-    if (typeof packageId === 'object' && packageId !== null) {
-      return packageId.name || 'Bilinmeyen Paket';
-    }
-    // Eğer packageId bir string ise (id referansı)
-    const packageItem = packages.find(p => p._id === packageId);
-    return packageItem ? packageItem.name : 'Bilinmeyen Paket';
-  };
-
   const handleCustomerNotArrived = async (appointmentId, customerNotArrived) => {
     try {
       await dispatch(updateCustomerNotArrived({ appointmentId, customerNotArrived })).unwrap();
@@ -99,22 +85,6 @@ export default function MyAppointments() {
       toast.error('Durum güncellenirken hata oluştu');
     }
   };
-
-  // Kullanıcının sattığı paketleri filtrele
-  const userPackageSales = packageSales.filter(pkg => {
-    if (isAdmin) {
-      return true; // Admin tüm paket satışlarını görebilir
-    } else {
-      return pkg.seller === currentUser._id || (pkg.seller && pkg.seller._id === currentUser._id);
-    }
-  });
-
-  // Paket satışlarını filtreleme
-  const filteredPackageSales = userPackageSales.filter(pkg => {
-    if (packageFilter === 'active') return pkg.status === 'active';
-    if (packageFilter === 'completed') return pkg.status === 'completed';
-    return true;
-  });
   
   // Filtreleme
   const filteredAppointments = userAppointments.filter(app => {
@@ -128,22 +98,10 @@ export default function MyAppointments() {
   const completedAppointments = userAppointments.filter(app => !app.customerNotArrived).length;
   const notArrivedAppointments = userAppointments.filter(app => app.customerNotArrived).length;
 
-  // Paket satış istatistikleri
-  const totalPackageSales = userPackageSales.length;
-  const activePackageSales = userPackageSales.filter(pkg => pkg.status === 'active').length;
-  const completedPackageSales = userPackageSales.filter(pkg => pkg.status === 'completed').length;
-
   // Tarih formatı
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('tr-TR');
-  };
-
-  // Para formatı
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' })
-      .format(amount)
-      .replace('₺', '') + ' ₺';
   };
 
   return (
@@ -166,7 +124,7 @@ export default function MyAppointments() {
           </div>
 
           {/* İstatistikler */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-6">
             <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 sm:p-4 rounded-lg text-white">
               <div className="flex items-center justify-between">
                 <div>
@@ -194,16 +152,6 @@ export default function MyAppointments() {
                   <p className="text-xl sm:text-2xl font-bold">{notArrivedAppointments}</p>
                 </div>
                 <FiXCircle className="h-6 w-6 sm:h-8 sm:w-8 text-red-200" />
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-3 sm:p-4 rounded-lg text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-xs sm:text-sm">Toplam Paket Satışı</p>
-                  <p className="text-xl sm:text-2xl font-bold">{totalPackageSales}</p>
-                </div>
-                <FiPackage className="h-6 w-6 sm:h-8 sm:w-8 text-purple-200" />
               </div>
             </div>
           </div>
@@ -325,106 +273,6 @@ export default function MyAppointments() {
                       >
                         {appointment.customerNotArrived ? 'Müşteri Geldi' : 'Müşteri Gelmedi'}
                       </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Paket Satışları */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden mt-6 sm:mt-8">
-          <div className="p-4 sm:p-6 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-0">Paket Satışları</h2>
-              
-              {/* Paket Filtreleri */}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setPackageFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    packageFilter === 'all'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Tümü ({totalPackageSales})
-                </button>
-                <button
-                  onClick={() => setPackageFilter('active')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    packageFilter === 'active'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Aktif ({activePackageSales})
-                </button>
-                <button
-                  onClick={() => setPackageFilter('completed')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    packageFilter === 'completed'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Tamamlanan ({completedPackageSales})
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {filteredPackageSales.length === 0 ? (
-            <div className="p-6 sm:p-12 text-center">
-              <FiPackage className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Paket Satışı Bulunamadı</h3>
-              <p className="text-sm sm:text-base text-gray-600">
-                {packageFilter === 'all' 
-                  ? (isAdmin ? 'Sistemde henüz paket satışı bulunmuyor.' : 'Henüz paket satışınız bulunmuyor.')
-                  : packageFilter === 'active'
-                  ? 'Aktif paket satışı bulunmuyor.'
-                  : 'Tamamlanan paket satışı bulunmuyor.'
-                }
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {filteredPackageSales.map((packageSale) => (
-                <div key={packageSale._id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 mb-2 sm:mb-0">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-0">
-                          {getPackageName(packageSale.package)}
-                        </h3>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium w-fit ${
-                          packageSale.status === 'active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {packageSale.status === 'active' ? 'Aktif' : 'Tamamlandı'}
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 mt-2">
-                        <div className="flex items-center">
-                          <FiCalendar className="h-4 w-4 mr-2 text-gray-400" />
-                          {formatDate(packageSale.saleDate)}
-                        </div>
-                        <div className="flex items-center">
-                          <FiUser className="h-4 w-4 mr-2 text-gray-400" />
-                          {packageSale.customer?.name || 'Müşteri Bilgisi Yok'}
-                        </div>
-                        <div className="flex items-center">
-                          <span className="text-gray-400 mr-2">₺</span>
-                          {formatCurrency(packageSale.totalPrice)}
-                        </div>
-                      </div>
-
-                      <div className="mt-2 text-xs sm:text-sm text-gray-600">
-                        <span className="font-medium">Kalan Seans:</span> {packageSale.remainingSessions || 0} / {packageSale.totalSessions || 0}
-                      </div>
                     </div>
                   </div>
                 </div>

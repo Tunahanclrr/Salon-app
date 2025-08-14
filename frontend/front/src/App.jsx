@@ -12,7 +12,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
-import Dashboard from './pages/Dashboard';
 import ChangePassword from './pages/ChangePassword';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import AdminPanel from './pages/AdminPanel';
@@ -20,6 +19,7 @@ import Appointments from './pages/Appointments';
 import Customers from './pages/Customers';
 import Services from './pages/Services';
 import PackageSales from './pages/PackageSales';
+import Packages from './pages/Packages';
 import MyAppointments from './pages/MyAppointments';
 
 function App() {
@@ -55,12 +55,10 @@ function App() {
         <Route 
           path="/login" 
           element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
+            isAuthenticated ? <Navigate to="/randevularim" replace /> : <Login />
           } 
         />
         
-        {/* Personnel Login Route */}
-
         {/* Protected Routes */}
         <Route 
           path="/" 
@@ -70,11 +68,8 @@ function App() {
             </ProtectedRoute>
           }
         >
-          {/* Default redirect to dashboard */}
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          
-          {/* Dashboard - accessible to all authenticated users */}
-          <Route path="dashboard" element={<EmployeeDashboard />} />
+          {/* Default redirect to my appointments */}
+          <Route index element={<Navigate to="/randevularim" replace />} />
           
           {/* Change Password - accessible to all authenticated users */}
           <Route path="sifre-degistir" element={<ChangePassword />} />
@@ -129,6 +124,16 @@ function App() {
             } 
           />
           
+          {/* Packages - requires canViewPackages permission */}
+          <Route 
+            path="paketler" 
+            element={
+              <ProtectedRoute requiredPermission="canViewPackages">
+                <Packages />
+              </ProtectedRoute>
+            } 
+          />
+          
           {/* User Appointments - accessible to all authenticated users */}
           <Route 
             path="randevularim" 
@@ -136,11 +141,11 @@ function App() {
           />
         </Route>
 
-        {/* Catch all - redirect to login if not authenticated, dashboard if authenticated */}
+        {/* Catch all - redirect to login if not authenticated, my appointments if authenticated */}
         <Route 
           path="*" 
           element={
-            <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
+            <Navigate to={isAuthenticated ? "/randevularim" : "/login"} replace />
           } 
         />
       </Routes>

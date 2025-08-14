@@ -32,7 +32,6 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   // Menu items with permission checks
   const getMenuItems = () => {
     const items = [
-      { path: '/dashboard', icon: FiHome, label: 'Ana Sayfa', permission: null },
       { path: '/randevularim', icon: FiUserCheck, label: 'Randevularım', permission: null },
     ]
 
@@ -56,6 +55,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
     if (permissions.canViewPackages || isAdmin) {
       items.push({ path: '/paket-satislari', icon: FiPackage, label: 'Paket Satışları', permission: 'canViewPackages' })
+      items.push({ path: '/paketler', icon: FiPackage, label: 'Paketler', permission: 'canViewPackages' })
     }
 
     return items
